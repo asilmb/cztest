@@ -1,6 +1,6 @@
 # Český trenažér
 
-Trenažér zkouškových otázek v češtině. Celá aplikace se sestaví do jedné HTML stránky
+Trenažér zkouškových otázek v češtině. Rozhraní je v ruštině, otázky v češtině (s volitelným ruským překladem). Celá aplikace se sestaví do jedné HTML stránky
 `dist/cesky-trenazer.html`, která se publikuje jako Claude artefakt.
 
 ## Sestavení
