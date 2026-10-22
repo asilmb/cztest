@@ -23,7 +23,13 @@ const snapshot = snapPath ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
 const config = existsSync(join(root, 'config.json')) ? JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) : {};
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 // shown at the bottom of every screen; `bank` tells the page when progress belongs to another question set
-const build = { version: pkg.version, builtAt: Date.now(), bank: createHash('sha256').update(JSON.stringify(questions)).digest('hex').slice(0, 12) };
+// The bank fingerprint covers only question ids and their correct answers, so regrouping or rewording
+// questions keeps everyone's progress; changing the set of questions or an answer starts it over.
+// questions/bank-compat.json lists older fingerprints whose progress is still valid for this bank.
+const bankId = createHash('sha256').update(JSON.stringify(questions.map(q => [q.id, [...q.correct].sort((x, y) => x - y)]).sort((x, y) => (x[0] < y[0] ? -1 : 1)))).digest('hex').slice(0, 12);
+const compatPath = join(root, 'questions', 'bank-compat.json');
+const bankCompat = existsSync(compatPath) ? JSON.parse(readFileSync(compatPath, 'utf8')) : [];
+const build = { version: pkg.version, builtAt: Date.now(), bank: bankId, bankCompat };
 const skeletonHead = readFileSync(join(root, 'src', 'skeleton-head.html'), 'utf8');
 
 // Artifact build: the artifact service adds the document skeleton itself; the page can republish
@@ -42,7 +48,7 @@ function assemble(target) {
     .replace('/*@QUESTIONS*/[]', () => jsonForScript(questions))
     .replace('/*@SKELETON_HEAD*/""', () => target === 'artifact' ? jsonForScript(skeletonHead) : '""')
     .replace('/*@TARGET*/"artifact"', () => JSON.stringify(target))
-    .replace("/*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev' }", () => JSON.stringify(build))
+    .replace("/*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev', bankCompat: [] }", () => JSON.stringify(build))
     .replace('/*@REMOTE_URL*/""', () => jsonForScript(target === 'pages' ? (config.appsScriptUrl || '') : ''))
     .replace('/*@PAGE*/""', () => TOK_PAGE);
   return readFileSync(join(root, 'src', 'template.html'), 'utf8')

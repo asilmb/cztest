@@ -5,7 +5,7 @@
 const QUESTIONS = /*@QUESTIONS*/[];
 
 // stamped by build.mjs: version from package.json, build time, and a fingerprint of the question bank
-const BUILD = /*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev' };
+const BUILD = /*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev', bankCompat: [] };
 const MASTERED_STREAK = 2;      // correct answers in a row that mark a question as learned
 const HISTORY_LIMIT = 300;      // finished runs kept in the shared document
 const COUNT_MIN = 10, COUNT_MAX = 100;
@@ -306,6 +306,12 @@ const snapshot = {
 function checkBank() {
   const b = S.progress.bank;
   if (b && b.id === BUILD.bank) return true;
+  if (b && (BUILD.bankCompat || []).includes(b.id)) {
+    // same questions under an older fingerprint (e.g. only regrouped): keep the progress, adopt the new id
+    S.progress.bank = { id: BUILD.bank, builtAt: BUILD.builtAt };
+    store.save('progress');
+    return true;
+  }
   const hasData = b || Object.keys(S.progress.q || {}).length || (S.progress.history || []).length || S.run.active;
   if (!hasData) { S.progress.bank = { id: BUILD.bank, builtAt: BUILD.builtAt }; return true; }
   if (b && (b.builtAt || 0) > BUILD.builtAt) {
