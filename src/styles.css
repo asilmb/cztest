@@ -117,7 +117,9 @@ h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; lette
 
 /* main */
 main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 32px; }
-.actionbar-spacer { height: 80px; }
+.build { max-width: 1040px; margin: 20px auto 0; text-align: center; font: 500 12px/1.4 var(--f-mono); color: var(--muted); }
+.quiz + .build { margin-top: 14px; }
+.actionbar + .build { margin-bottom: 84px; }   /* clears the fixed bar on the results screen */
 .section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }

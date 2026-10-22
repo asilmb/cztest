@@ -20,6 +20,8 @@ const jsonForScript = v => JSON.stringify(v).replace(/</g, '\\u003c');
 
 const snapshot = snapPath ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
 const config = existsSync(join(root, 'config.json')) ? JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) : {};
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const build = { version: pkg.version, builtAt: Date.now() };   // shown at the bottom of every screen
 const skeletonHead = readFileSync(join(root, 'src', 'skeleton-head.html'), 'utf8');
 
 // Artifact build: the artifact service adds the document skeleton itself; the page can republish
@@ -38,6 +40,7 @@ function assemble(target) {
     .replace('/*@QUESTIONS*/[]', () => jsonForScript(questions))
     .replace('/*@SKELETON_HEAD*/""', () => target === 'artifact' ? jsonForScript(skeletonHead) : '""')
     .replace('/*@TARGET*/"artifact"', () => JSON.stringify(target))
+    .replace("/*@BUILD*/{ version: 'dev', builtAt: 0 }", () => JSON.stringify(build))
     .replace('/*@REMOTE_URL*/""', () => jsonForScript(target === 'pages' ? (config.appsScriptUrl || '') : ''))
     .replace('/*@PAGE*/""', () => TOK_PAGE);
   return readFileSync(join(root, 'src', 'template.html'), 'utf8')

@@ -4,6 +4,7 @@
 /* ---------- question bank (inlined by build.mjs from questions/questions.json) ---------- */
 const QUESTIONS = /*@QUESTIONS*/[];
 
+const BUILD = /*@BUILD*/{ version: 'dev', builtAt: 0 };   // stamped by build.mjs from package.json and the build time
 const MASTERED_STREAK = 2;      // correct answers in a row that mark a question as learned
 const HISTORY_LIMIT = 300;      // finished runs kept in the shared document
 const COUNT_MIN = 10, COUNT_MAX = 100;
@@ -483,9 +484,11 @@ function render() {
   renderChrome();
   const v = $('#view');
   const status = `<p class="store-line" data-mode="${store.mode}">${esc($('#store-pill').textContent)}</p>`;
-  if (S.screen === 'stats') v.innerHTML = localBanner() + status + viewStats();
-  else if (S.screen === 'quiz' && S.run.active) v.innerHTML = localBanner() + (S.run.finished ? viewResults() : viewQuiz());
-  else { S.screen = 'setup'; v.innerHTML = localBanner() + status + viewSetup(); }
+  const built = BUILD.builtAt ? new Date(BUILD.builtAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const footer = `<footer class="build">Версия ${esc(BUILD.version)}${built ? ` · сборка ${built}` : ''}</footer>`;
+  if (S.screen === 'stats') v.innerHTML = localBanner() + status + viewStats() + footer;
+  else if (S.screen === 'quiz' && S.run.active) v.innerHTML = localBanner() + (S.run.finished ? viewResults() : viewQuiz()) + footer;
+  else { S.screen = 'setup'; v.innerHTML = localBanner() + status + viewSetup() + footer; }
 }
 
 function viewSetup() {
@@ -659,7 +662,6 @@ function viewResults() {
         <ul class="qlist">${list.map(q => `<li>${tx(q.question)}<span class="badge">${esc(q.category)}</span></li>`).join('')}</ul></div>`
         : `<p>${L('Bez jediné chyby. Skvělá práce!', 'Ни одной ошибки. Отличная работа!')}</p>`}
     </section>
-    <div class="actionbar-spacer"></div>
   </div>
   <div class="actionbar"><div class="actionbar-in">
     <button type="button" class="btn" data-action="nav" data-screen="stats">Статистика</button>
