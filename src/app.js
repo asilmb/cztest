@@ -91,6 +91,7 @@ const savePrefs = () => lsSet('cztest:prefs', prefs);
 /* ---------- storage: shared db when writable, this device otherwise ---------- */
 const store = {
   mode: 'connecting',    // connecting | shared | readonly | local
+  reason: '',            // why the view is not shared: 'nodb' (no database here) or 'nowrite' (view-only access)
   db: null, refs: {}, unsubs: [], writing: {}, again: {}, seen: {}, dirty: {},
 
   async init() {
@@ -100,7 +101,7 @@ const store = {
     if (start) { S.progress = start.progress || S.progress; S.run = start.run || S.run; S.sel = S.run.sel || []; }
     let db = null;
     try { db = window.claude?.use ? await window.claude.use('db') : null; } catch { db = null; }
-    if (!db) return this.useLocal(newest(local, mirror, EMBEDDED));
+    if (!db) { this.reason = 'nodb'; return this.useLocal(newest(local, mirror, EMBEDDED)); }
     let canWrite = null, user = null;
     try { user = await window.claude.use('user'); canWrite = user ? await user.can('data.write') : null; } catch { canWrite = null; }
     this.db = db;
@@ -111,6 +112,7 @@ const store = {
       let shared = null;
       try { const [p, r] = await Promise.all([this.refs.progress.get(), this.refs.run.get()]); shared = { progress: p.exists ? p.data() : null, run: r.exists ? r.data() : null }; } catch { shared = null; }
       const own = newest(local, EMBEDDED);
+      this.reason = 'nowrite';
       if (own && stampOf(own) > stampOf(shared)) return this.useLocal(own);
     }
     this.mode = canWrite === false ? 'readonly' : 'shared';
@@ -171,7 +173,7 @@ const store = {
         await this.write(key);
       } while (this.again[key]);
     } catch (e) {
-      if (e?.code === 'invalid_argument' || e?.code === 'not_granted' || e?.code === 'revoked' || e?.code === 'capability_disabled') this.useLocalFromCurrent();
+      if (e?.code === 'invalid_argument' || e?.code === 'not_granted' || e?.code === 'revoked' || e?.code === 'capability_disabled') { this.reason = this.reason || 'nowrite'; this.useLocalFromCurrent(); }
       else toast('Не удалось сохранить. Попробуйте ещё раз.');
     } finally { this.writing[key] = false; }
   },
@@ -191,7 +193,7 @@ const store = {
     this.unsubs = [];
     this.mode = 'local';
     this.persistLocal();
-    renderChrome();
+    render();
   },
 
   persistLocal() { lsSet('cztest:local', { progress: S.progress, run: S.run }); },
@@ -389,10 +391,15 @@ function renderChrome() {
 
 /* ---------- views ---------- */
 function localBanner() {
-  if (store.mode !== 'local' || S.bannerClosed) return '';
-  return `<div class="notice" role="status"><div><strong>Прогресс сохраняется только в этом браузере.</strong>
-    Общий прогресс доступен, только если открыть ссылку <b>claude.ai/artifact/…</b> после входа в аккаунт claude.ai.
-    Здесь тест продолжается с последнего общего сохранения, но новые ответы в общий прогресс не попадут.</div>
+  if (S.bannerClosed || (store.mode !== 'local' && store.mode !== 'readonly')) return '';
+  const text = store.reason === 'nowrite'
+    ? `<strong>У вашего аккаунта доступ только на просмотр.</strong>
+      Вы видите общий прогресс, но ваши ответы сохраняются только в этом браузере.
+      Чтобы отвечать в общий прогресс, владелец должен пригласить вас по email с правом редактирования (Editor).`
+    : `<strong>Прогресс сохраняется только в этом браузере.</strong>
+      Общий прогресс доступен, только если открыть ссылку <b>claude.ai/artifact/…</b> после входа в аккаунт claude.ai.
+      Здесь тест продолжается с последнего общего сохранения, но новые ответы в общий прогресс не попадут.`;
+  return `<div class="notice" role="status"><div>${text}</div>
     <button type="button" class="notice-x" data-action="close-banner" aria-label="Скрыть">${ICON.cross}</button></div>`;
 }
 
