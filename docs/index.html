@@ -428,7 +428,7 @@ const savePrefs = () => lsSet('cztest:prefs', prefs);
    GET returns { progress, run }; POST { key, data } stores one of them unless the sheet already
    holds a newer copy, in which case it answers { stale: true, [key]: newer }. */
 const TARGET = "pages";
-const REMOTE_URL = "";
+const REMOTE_URL = "https://script.google.com/macros/s/AKfycbyyJ_uT9QJ1DIFheIs27Et8RIffGXgWxQdAxmhqqHOXodwaHBXnX08jGX7sSGGEqZLo/exec";
 const REMOTE_POLL_MS = 15000;
 async function fetchJson(url, opts = {}) {
   const ctl = new AbortController();
