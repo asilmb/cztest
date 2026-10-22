@@ -88,11 +88,36 @@ const S = {
 };
 const savePrefs = () => lsSet('cztest:prefs', prefs);
 
-/* ---------- storage: shared db when writable, this device otherwise ---------- */
+/* ---------- Google Sheets backend (GitHub Pages build) ----------
+   An Apps Script web app (apps-script/Code.gs) keeps the two documents in a spreadsheet.
+   GET returns { progress, run }; POST { key, data } stores one of them unless the sheet already
+   holds a newer copy, in which case it answers { stale: true, [key]: newer }. */
+const TARGET = /*@TARGET*/"artifact";
+const REMOTE_URL = /*@REMOTE_URL*/"";
+const REMOTE_POLL_MS = 15000;
+async function fetchJson(url, opts = {}) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctl.signal, redirect: 'follow', cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const body = await res.json();
+    if (body && body.error) throw new Error(body.error);
+    return body;
+  } finally { clearTimeout(timer); }
+}
+const remote = {
+  get: () => fetchJson(REMOTE_URL + (REMOTE_URL.includes('?') ? '&' : '?') + 't=' + Date.now()),
+  // text/plain body keeps this a "simple" request, so the browser sends no CORS preflight Apps Script can't answer
+  post: (key, data) => fetchJson(REMOTE_URL, { method: 'POST', body: JSON.stringify({ key, data }) }),
+};
+
+/* ---------- storage: shared progress when reachable, this device otherwise ---------- */
 const store = {
   mode: 'connecting',    // connecting | shared | readonly | local
-  reason: '',            // why the view is not shared: 'nodb' (no database here) or 'nowrite' (view-only access)
-  db: null, refs: {}, unsubs: [], writing: {}, again: {}, seen: {}, dirty: {},
+  reason: '',            // why the view is not shared: nodb | nowrite | remote | noconfig
+  backend: '',           // db | remote
+  db: null, refs: {}, unsubs: [], writing: {}, again: {}, seen: {}, dirty: {}, newer: {}, pollTimer: null,
 
   async init() {
     const mirror = lsGet('cztest:mirror');
@@ -101,7 +126,9 @@ const store = {
     if (start) { S.progress = start.progress || S.progress; S.run = start.run || S.run; S.sel = S.run.sel || []; }
     let db = null;
     try { db = window.claude?.use ? await window.claude.use('db') : null; } catch { db = null; }
+    if (!db && TARGET === 'pages') return this.initRemote(local, mirror);
     if (!db) { this.reason = 'nodb'; return this.useLocal(newest(local, mirror, EMBEDDED)); }
+    this.backend = 'db';
     let canWrite = null, user = null;
     try { user = await window.claude.use('user'); canWrite = user ? await user.can('data.write') : null; } catch { canWrite = null; }
     this.db = db;
@@ -123,9 +150,38 @@ const store = {
     renderChrome();
   },
 
+  async initRemote(local, mirror) {
+    if (!REMOTE_URL) { this.reason = 'noconfig'; return this.useLocal(newest(local, mirror)); }
+    let data;
+    try { data = await remote.get(); }
+    catch { this.reason = 'remote'; return this.useLocal(newest(local, mirror)); }
+    this.backend = 'remote';
+    this.mode = 'shared';
+    this.applyRemote(data);
+    const poll = async () => {
+      clearTimeout(this.pollTimer);
+      if (document.visibilityState === 'visible' && this.mode === 'shared') {
+        for (const key of ['progress', 'run']) if (this.dirty[key] && !this.writing[key]) { this.dirty[key] = false; this.flush(key); }
+        try { this.applyRemote(await remote.get()); } catch { /* offline for now; try again on the next tick */ }
+      }
+      this.pollTimer = setTimeout(poll, REMOTE_POLL_MS);
+    };
+    this.pollTimer = setTimeout(poll, REMOTE_POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
+    renderChrome();
+  },
+
+  applyRemote(data) {
+    for (const key of ['progress', 'run']) {
+      const d = data && data[key];
+      this.onSnap(key, { exists: !!d, data: () => d });
+    }
+  },
+
   useLocal(local) {
     this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
     this.unsubs = [];
+    clearTimeout(this.pollTimer);
     if (local) { S.progress = clone(local.progress || emptyProgress()); S.run = clone(local.run || emptyRun()); S.sel = S.run.sel || []; }
     this.mode = 'local';
     this.persistLocal();
@@ -173,13 +229,24 @@ const store = {
         await this.write(key);
       } while (this.again[key]);
     } catch (e) {
-      if (e?.code === 'invalid_argument' || e?.code === 'not_granted' || e?.code === 'revoked' || e?.code === 'capability_disabled') { this.reason = this.reason || 'nowrite'; this.useLocalFromCurrent(); }
+      if (this.backend === 'remote') { this.dirty[key] = true; toast('Нет связи с общим прогрессом. Повторю сохранение автоматически.'); }
+      else if (e?.code === 'invalid_argument' || e?.code === 'not_granted' || e?.code === 'revoked' || e?.code === 'capability_disabled') { this.reason = this.reason || 'nowrite'; this.useLocalFromCurrent(); }
       else toast('Не удалось сохранить. Попробуйте ещё раз.');
     } finally { this.writing[key] = false; }
+    if (this.newer[key]) {
+      // the sheet held a newer copy than ours: take it, as if it had arrived by polling
+      const d = this.newer[key]; this.newer[key] = null;
+      this.onSnap(key, { exists: true, data: () => d });
+    }
   },
 
   async write(key) {
     const data = clone(key === 'progress' ? S.progress : S.run);
+    if (this.backend === 'remote') {
+      const res = await remote.post(key, data);
+      if (res && res.stale && res[key]) this.newer[key] = res[key];
+      return;
+    }
     try { await this.refs[key].set(data); }
     catch (e) {
       if (e?.code !== 'unavailable') throw e;
@@ -191,6 +258,7 @@ const store = {
   useLocalFromCurrent() {
     this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
     this.unsubs = [];
+    clearTimeout(this.pollTimer);
     this.mode = 'local';
     this.persistLocal();
     render();
@@ -381,7 +449,7 @@ function renderChrome() {
   const pill = $('#store-pill');
   const labels = {
     connecting: ['Подключение…', 'Загружаю общий прогресс'],
-    shared: ['Общий прогресс', 'Прогресс видят и сохраняют все, кто открывает эту ссылку'],
+    shared: ['Общий прогресс', store.backend === 'remote' ? 'Прогресс хранится в общей Google-таблице' : 'Прогресс видят и сохраняют все, кто открывает эту ссылку'],
     readonly: ['Общий прогресс · только чтение', 'Ваши ответы сохранятся только на этом устройстве'],
     local: ['Только это устройство', 'Прогресс сохраняется только в этом браузере'],
   };
@@ -392,13 +460,20 @@ function renderChrome() {
 /* ---------- views ---------- */
 function localBanner() {
   if (S.bannerClosed || (store.mode !== 'local' && store.mode !== 'readonly')) return '';
-  const text = store.reason === 'nowrite'
-    ? `<strong>У вашего аккаунта доступ только на просмотр.</strong>
+  const texts = {
+    nowrite: `<strong>У вашего аккаунта доступ только на просмотр.</strong>
       Вы видите общий прогресс, но ваши ответы сохраняются только в этом браузере.
-      Чтобы отвечать в общий прогресс, владелец должен пригласить вас по email с правом редактирования (Editor).`
-    : `<strong>Прогресс сохраняется только в этом браузере.</strong>
+      Чтобы отвечать в общий прогресс, владелец должен пригласить вас по email с правом редактирования (Editor).`,
+    remote: `<strong>Нет связи с общим прогрессом.</strong>
+      Google-таблица сейчас недоступна, поэтому ответы сохраняются только в этом браузере.
+      Обновите страницу, когда появится интернет.`,
+    noconfig: `<strong>Общий прогресс не подключён.</strong>
+      В <b>config.json</b> не указан адрес веб-приложения Apps Script, поэтому ответы сохраняются только в этом браузере.`,
+    nodb: `<strong>Прогресс сохраняется только в этом браузере.</strong>
       Общий прогресс доступен, только если открыть ссылку <b>claude.ai/artifact/…</b> после входа в аккаунт claude.ai.
-      Здесь тест продолжается с последнего общего сохранения, но новые ответы в общий прогресс не попадут.`;
+      Здесь тест продолжается с последнего общего сохранения, но новые ответы в общий прогресс не попадут.`,
+  };
+  const text = texts[store.reason] || texts.nodb;
   return `<div class="notice" role="status"><div>${text}</div>
     <button type="button" class="notice-x" data-action="close-banner" aria-label="Скрыть">${ICON.cross}</button></div>`;
 }

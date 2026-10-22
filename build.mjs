@@ -1,7 +1,7 @@
-// Builds dist/cesky-trenazer.html — one self-contained page that is published as the artifact.
+// Builds dist/cesky-trenazer.html (published as the Claude artifact) and docs/index.html (served by GitHub Pages).
 // Usage: node build.mjs [path/to/questions.json] [--snapshot state.json]
 //   --snapshot embeds { progress, run } (the artifact's quiz/progress and quiz/run documents) so the page opens there.
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,7 +10,6 @@ const args = process.argv.slice(2);
 const flag = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
 const snapPath = flag('--snapshot');
 const qPath = args[0] || join(root, 'questions', 'questions.json');
-const out = join(root, 'dist', 'cesky-trenazer.html');
 
 const questions = JSON.parse(readFileSync(qPath, 'utf8'));
 validate(questions);
@@ -20,20 +19,37 @@ const TOK_PAGE = '"@@PAGE@@"', TOK_SNAP = '@@SNAPSHOT@@';
 const jsonForScript = v => JSON.stringify(v).replace(/</g, '\\u003c');
 
 const snapshot = snapPath ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
-const app = readFileSync(join(root, 'src', 'app.js'), 'utf8')
-  .replace('/*@QUESTIONS*/[]', () => jsonForScript(questions))
-  .replace('/*@SKELETON_HEAD*/""', () => jsonForScript(readFileSync(join(root, 'src', 'skeleton-head.html'), 'utf8')))
-  .replace('/*@PAGE*/""', () => TOK_PAGE);
-const page = readFileSync(join(root, 'src', 'template.html'), 'utf8')
-  .replace('/*@STYLES*/', () => readFileSync(join(root, 'src', 'styles.css'), 'utf8'))
-  .replace('/*@APP*/', () => app)
-  .replace('/*@SNAPSHOT*/', () => TOK_SNAP);
-for (const tok of [TOK_PAGE, TOK_SNAP]) if (page.split(tok).length !== 2) { console.error(`build: token ${tok} must occur exactly once`); process.exit(1); }
-const html = page.replace(TOK_SNAP, () => jsonForScript(snapshot)).replace(TOK_PAGE, () => jsonForScript(page));
+const config = existsSync(join(root, 'config.json')) ? JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) : {};
+const skeletonHead = readFileSync(join(root, 'src', 'skeleton-head.html'), 'utf8');
 
-mkdirSync(dirname(out), { recursive: true });
-writeFileSync(out, html);
-console.log(`Built ${out} — ${questions.length} questions${snapshot ? ', with progress snapshot' : ''}, ${(html.length / 1024).toFixed(1)} KiB`);
+// Artifact build: the artifact service adds the document skeleton itself; the page can republish
+// itself with a progress snapshot, so it carries its own source (PAGE).
+const artifact = assemble('artifact');
+if (artifact.split(TOK_PAGE).length !== 2 || artifact.split(TOK_SNAP).length !== 2) { console.error('build: PAGE/SNAPSHOT tokens must occur exactly once'); process.exit(1); }
+write(join(root, 'dist', 'cesky-trenazer.html'), artifact.replace(TOK_SNAP, () => jsonForScript(snapshot)).replace(TOK_PAGE, () => jsonForScript(artifact)));
+
+// GitHub Pages build: a full document that keeps its progress in the Google Sheet behind config.appsScriptUrl.
+const pages = assemble('pages').replace(TOK_SNAP, 'null').replace(TOK_PAGE, '""');
+write(join(root, 'docs', 'index.html'), skeletonHead + pages + '\n</body></html>\n');
+if (!config.appsScriptUrl) console.warn('config.json has no "appsScriptUrl": the GitHub Pages build keeps progress only in each browser.');
+
+function assemble(target) {
+  const app = readFileSync(join(root, 'src', 'app.js'), 'utf8')
+    .replace('/*@QUESTIONS*/[]', () => jsonForScript(questions))
+    .replace('/*@SKELETON_HEAD*/""', () => target === 'artifact' ? jsonForScript(skeletonHead) : '""')
+    .replace('/*@TARGET*/"artifact"', () => JSON.stringify(target))
+    .replace('/*@REMOTE_URL*/""', () => jsonForScript(target === 'pages' ? (config.appsScriptUrl || '') : ''))
+    .replace('/*@PAGE*/""', () => TOK_PAGE);
+  return readFileSync(join(root, 'src', 'template.html'), 'utf8')
+    .replace('/*@STYLES*/', () => readFileSync(join(root, 'src', 'styles.css'), 'utf8'))
+    .replace('/*@APP*/', () => app)
+    .replace('/*@SNAPSHOT*/', () => TOK_SNAP);
+}
+function write(file, html) {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, html);
+  console.log(`Built ${file} — ${questions.length} questions, ${(html.length / 1024).toFixed(1)} KiB`);
+}
 
 function validate(qs) {
   if (!Array.isArray(qs) || !qs.length) fail('questions.json must be a non-empty array');

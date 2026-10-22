@@ -1,7 +1,36 @@
 # Český trenažér
 
-Trenažér zkouškových otázek v češtině. Rozhraní je v ruštině, otázky v češtině (s volitelným ruským překladem). Celá aplikace se sestaví do jedné HTML stránky
-`dist/cesky-trenazer.html`, která se publikuje jako Claude artefakt.
+Trenažér zkouškových otázek v češtině. Rozhraní je v ruštině, otázky v češtině (s volitelným ruským překladem). Sestaví se do dvou stránek: `dist/cesky-trenazer.html` (Claude artefakt) a `docs/index.html` (GitHub Pages).
+
+## Сайт на GitHub Pages с общим прогрессом в Google-таблице
+
+Версия для GitHub Pages лежит в `docs/index.html`. Общий прогресс она хранит в Google-таблице
+через веб-приложение Apps Script (`apps-script/Code.gs`). Аккаунты для этого не нужны: любой,
+кто открыл ссылку, видит и пополняет один общий прогресс.
+
+### 1. Google-таблица и Apps Script
+1. Создайте новую Google-таблицу (sheets.new).
+2. Откройте «Расширения → Apps Script», удалите заготовку и вставьте содержимое `apps-script/Code.gs`. Сохраните.
+3. «Начать развёртывание → Новое развёртывание» → тип «Веб-приложение».
+   - Запуск от имени: **я**
+   - У кого есть доступ: **все**
+4. Разрешите доступ к таблице и скопируйте URL веб-приложения (заканчивается на `/exec`).
+
+### 2. Адрес в config.json и сборка
+```sh
+# config.json
+{ "appsScriptUrl": "https://script.google.com/macros/s/…/exec" }
+node build.mjs
+```
+Закоммитьте и запушьте `config.json` и `docs/`.
+
+### 3. Включить GitHub Pages
+Settings → Pages → Build and deployment → Source: «Deploy from a branch», ветка с этим кодом, папка `/docs`.
+
+Прогресс хранится на листе `data` (служебные данные, не редактируйте) и дублируется в читаемом виде на листе
+`Статистика`. Записывать может любой, у кого есть ссылка на сайт. Если после изменения `Code.gs` создать
+новое развёртывание, URL изменится: обновите `config.json`. Чтобы URL остался прежним, используйте
+«Управление развёртываниями → изменить → новая версия».
 
 ## Sestavení
 
