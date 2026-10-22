@@ -15,6 +15,8 @@
   --ok-soft: #e1f3e8;
   --bad: #c42f37;
   --bad-soft: #fbe5e6;
+  --warn: #d79a1e;
+  --warn-soft: #fdf3dc;
   --learn: #7f93e0;
   --new: #cfd5e2;
   --blueprint: #1c3399;
@@ -30,7 +32,7 @@
   :root:not([data-theme="light"]) {
     --bg: #0d1120; --surface: #161b2e; --surface-2: #1e2540; --ink: #e9ecf6; --ink-2: #b0b8d2; --muted: #7f88a6;
     --line: #2a3254; --accent: #8199ff; --accent-soft: #232d57; --accent-ink: #0d1120;
-    --ok: #4cc583; --ok-soft: #133022; --bad: #ff6f76; --bad-soft: #3b171b; --learn: #5c6fc0; --new: #333b5c;
+    --ok: #4cc583; --ok-soft: #133022; --bad: #ff6f76; --bad-soft: #3b171b; --warn: #c99a3a; --warn-soft: #34290f; --learn: #5c6fc0; --new: #333b5c;
     --blueprint: #121c4f; --blueprint-dot: rgba(160, 180, 255, .14);
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
     color-scheme: dark;
@@ -39,7 +41,7 @@
 :root[data-theme="dark"] {
   --bg: #0d1120; --surface: #161b2e; --surface-2: #1e2540; --ink: #e9ecf6; --ink-2: #b0b8d2; --muted: #7f88a6;
   --line: #2a3254; --accent: #8199ff; --accent-soft: #232d57; --accent-ink: #0d1120;
-  --ok: #4cc583; --ok-soft: #133022; --bad: #ff6f76; --bad-soft: #3b171b; --learn: #5c6fc0; --new: #333b5c;
+  --ok: #4cc583; --ok-soft: #133022; --bad: #ff6f76; --bad-soft: #3b171b; --warn: #c99a3a; --warn-soft: #34290f; --learn: #5c6fc0; --new: #333b5c;
   --blueprint: #121c4f; --blueprint-dot: rgba(160, 180, 255, .14);
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
   color-scheme: dark;
@@ -154,6 +156,11 @@ main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-
 .count-row input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; min-width: 0; }
 .count-val { font: 600 26px/1 var(--f-mono); min-width: 2.5ch; text-align: right; }
 
+.notice { display: flex; gap: 12px; align-items: flex-start; margin: 0 auto 16px; max-width: 1040px; padding: 12px 14px; border-radius: var(--r);
+  background: var(--warn-soft); border: 1px solid var(--warn); font-size: 14px; line-height: 1.45; color: var(--ink); }
+.notice strong { display: block; margin-bottom: 2px; }
+.notice-x { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 0; background: transparent; color: var(--ink-2); display: grid; place-items: center; }
+.notice-x svg { width: 14px; height: 14px; }
 .label-row { display: flex; align-items: center; gap: 8px; }
 .hint-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--muted); background: var(--surface); color: var(--ink-2);
   font: 700 13px/1 var(--f-body); display: inline-grid; place-items: center; padding: 0; letter-spacing: 0; text-transform: none; position: relative; }

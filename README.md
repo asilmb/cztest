@@ -12,6 +12,13 @@ node build.mjs cesta/k/otazkam.json # jiná sada otázek
 
 Skript otázky zkontroluje (unikátní `id`, platné indexy správných odpovědí…) a vloží je do stránky.
 
+### Snímek postupu ve stránce
+
+Stránka v sobě nese poslední sdílený stav (`<script id="cz-snapshot">`). Zobrazení vlastníka ji při odchodu
+ze stránky znovu publikuje s aktuálním stavem, takže i bez přístupu k databázi (bez přihlášení, mimo prohlížeč
+claude.ai) se test otevře tam, kde skončil. Před ručním publikováním nové verze uložte dokumenty `quiz/progress`
+a `quiz/run` do `state.json` jako `{ "progress": …, "run": … }` a sestavte `node build.mjs --snapshot state.json`.
+
 ## Formát otázek (`questions/questions.json`)
 
 ```json

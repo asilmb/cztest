@@ -8,6 +8,20 @@ const MASTERED_STREAK = 2;      // correct answers in a row that mark a question
 const HISTORY_LIMIT = 300;      // finished runs kept in the shared document
 const COUNT_MIN = 10, COUNT_MAX = 100;
 
+/* ---------- self-snapshot: the page carries the latest shared state inside itself ----------
+   PAGE is this page's own source with two tokens (filled in by build.mjs); SKELETON_HEAD is the
+   document head the artifact service wraps every page in. Together they let the owner's view
+   republish the page with the current progress embedded, so views without the shared database
+   (signed out, or the page opened outside the claude.ai viewer) still open where you stopped. */
+const PAGE = /*@PAGE*/"";
+const SKELETON_HEAD = /*@SKELETON_HEAD*/"";
+const TOK_PAGE = '"@@' + 'PAGE@@"', TOK_SNAP = '@@' + 'SNAPSHOT@@';
+const jsonForScript = v => JSON.stringify(v).replace(/</g, '\\u003c');
+const renderPage = snapJson => PAGE.replace(TOK_SNAP, () => snapJson).replace(TOK_PAGE, () => jsonForScript(PAGE));
+const EMBEDDED = (() => { try { return JSON.parse(document.getElementById('cz-snapshot')?.textContent || 'null'); } catch { return null; } })();
+const stampOf = st => st ? Math.max(st.progress?.updatedAt || 0, st.run?.updatedAt || 0) : 0;
+const newest = (...states) => states.filter(x => x && (x.progress || x.run)).sort((a, b) => stampOf(b) - stampOf(a))[0] || null;
+
 /* ---------- helpers ---------- */
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -68,7 +82,7 @@ const S = {
   progress: emptyProgress(),
   run: emptyRun(),
   screen: 'setup',
-  sel: [],               // current selection before answering (not persisted)
+  sel: [],               // current selection before answering (saved into the run after a short pause)
   confirm: null,         // which inline confirmation is open
   resetText: '',
 };
@@ -82,17 +96,25 @@ const store = {
   async init() {
     const mirror = lsGet('cztest:mirror');
     const local = lsGet('cztest:local');
-    if (mirror) { S.progress = mirror.progress || S.progress; S.run = mirror.run || S.run; }
+    const start = newest(mirror, EMBEDDED);
+    if (start) { S.progress = start.progress || S.progress; S.run = start.run || S.run; S.sel = S.run.sel || []; }
     let db = null;
     try { db = window.claude?.use ? await window.claude.use('db') : null; } catch { db = null; }
-    if (!db) return this.useLocal(local);
-    let canWrite = null;
-    try { const user = await window.claude.use('user'); canWrite = user ? await user.can('data.write') : null; } catch { canWrite = null; }
-    if (canWrite === false && local) return this.useLocal(local);
+    if (!db) return this.useLocal(newest(local, mirror, EMBEDDED));
+    let canWrite = null, user = null;
+    try { user = await window.claude.use('user'); canWrite = user ? await user.can('data.write') : null; } catch { canWrite = null; }
     this.db = db;
-    this.mode = canWrite === false ? 'readonly' : 'shared';
     this.refs.progress = db.doc('quiz/progress');
     this.refs.run = db.doc('quiz/run');
+    if (canWrite === false) {
+      // read-only viewer: continue from whichever is newer, the shared state or this device's own copy
+      let shared = null;
+      try { const [p, r] = await Promise.all([this.refs.progress.get(), this.refs.run.get()]); shared = { progress: p.exists ? p.data() : null, run: r.exists ? r.data() : null }; } catch { shared = null; }
+      const own = newest(local, EMBEDDED);
+      if (own && stampOf(own) > stampOf(shared)) return this.useLocal(own);
+    }
+    this.mode = canWrite === false ? 'readonly' : 'shared';
+    if (this.mode === 'shared') snapshot.init(user);
     for (const key of ['progress', 'run']) {
       this.unsubs.push(this.refs[key].onSnapshot(snap => this.onSnap(key, snap), () => this.useLocalFromCurrent()));
     }
@@ -102,7 +124,7 @@ const store = {
   useLocal(local) {
     this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
     this.unsubs = [];
-    if (local) { S.progress = local.progress || emptyProgress(); S.run = local.run || emptyRun(); }
+    if (local) { S.progress = clone(local.progress || emptyProgress()); S.run = clone(local.run || emptyRun()); S.sel = S.run.sel || []; }
     this.mode = 'local';
     this.persistLocal();
     if (S.run.active && !S.run.finished) S.screen = 'quiz';
@@ -175,11 +197,37 @@ const store = {
   persistLocal() { lsSet('cztest:local', { progress: S.progress, run: S.run }); },
 };
 
+/* Owner/editor views republish the page with the current state embedded when they go to the
+   background, so the link opens at the latest point even where the database is unreachable. */
+const snapshot = {
+  artifact: null, busy: false,
+  async init(user) {
+    try {
+      if (!user || !(await user.canEdit())) return;
+      this.artifact = await window.claude.use('artifact');
+    } catch { this.artifact = null; }
+    if (!this.artifact || !PAGE || !SKELETON_HEAD) return;
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.publish(); });
+    window.addEventListener('pagehide', () => this.publish());
+  },
+  async publish() {
+    if (!this.artifact || this.busy || store.mode !== 'shared') return;
+    const state = { progress: S.progress, run: S.run };
+    if (stampOf(state) <= stampOf(EMBEDDED)) return;
+    this.busy = true;
+    try {
+      const content = renderPage(jsonForScript(state));
+      await this.artifact.publish(SKELETON_HEAD + content + '\n</body></html>');
+    } catch { /* conflict, rate limit or no permission: the shared database still holds the state */ }
+    finally { this.busy = false; }
+  },
+};
+
 function onRemoteChange(key, first) {
   if (key === 'run') {
     if (first && S.run.active && !S.run.finished) S.screen = 'quiz';
     const sig = runSig();
-    if (sig !== S.lastRunSig) { S.lastRunSig = sig; S.sel = []; if (S.screen !== 'stats') render(); }
+    if (sig !== S.lastRunSig || first) { S.lastRunSig = sig; S.sel = S.run.sel || []; if (S.screen !== 'stats') render(); }
   } else if (S.screen !== 'quiz' || first) render();
   renderChrome();
 }
@@ -256,6 +304,8 @@ function submit() {
   const picked = S.sel.slice().sort((a, b) => a - b);
   const ok = sameSet(picked, q.correct);
   r.log[r.pos] = { p: picked, ok };
+  r.sel = [];
+  clearTimeout(selTimer);
   if (r.pos < r.main) ok ? r.firstOk++ : r.firstBad++;
   if (!ok && !r.order.slice(r.pos + 1).includes(q.id)) r.order.push(q.id);   // ask again until answered correctly
   record(q.id, ok);
@@ -270,7 +320,7 @@ function next() {
   const r = S.run;
   if (!r.log[r.pos]) return;
   r.pos++;
-  S.sel = [];
+  S.sel = []; r.sel = [];
   if (!currentQ()) finishRun();
   S.lastRunSig = runSig();
   store.save('run');
@@ -338,12 +388,20 @@ function renderChrome() {
 }
 
 /* ---------- views ---------- */
+function localBanner() {
+  if (store.mode !== 'local' || S.bannerClosed) return '';
+  return `<div class="notice" role="status"><div><strong>Прогресс сохраняется только в этом браузере.</strong>
+    Общий прогресс доступен, только если открыть ссылку <b>claude.ai/artifact/…</b> после входа в аккаунт claude.ai.
+    Здесь тест продолжается с последнего общего сохранения, но новые ответы в общий прогресс не попадут.</div>
+    <button type="button" class="notice-x" data-action="close-banner" aria-label="Скрыть">${ICON.cross}</button></div>`;
+}
+
 function render() {
   renderChrome();
   const v = $('#view');
-  if (S.screen === 'stats') v.innerHTML = viewStats();
-  else if (S.screen === 'quiz' && S.run.active) v.innerHTML = S.run.finished ? viewResults() : viewQuiz();
-  else { S.screen = 'setup'; v.innerHTML = viewSetup(); }
+  if (S.screen === 'stats') v.innerHTML = localBanner() + viewStats();
+  else if (S.screen === 'quiz' && S.run.active) v.innerHTML = localBanner() + (S.run.finished ? viewResults() : viewQuiz());
+  else { S.screen = 'setup'; v.innerHTML = localBanner() + viewSetup(); }
 }
 
 function viewSetup() {
@@ -649,6 +707,7 @@ document.addEventListener('click', e => {
       if (S.run.active && !S.run.finished) { S.confirm = 'replace'; break; }
       startRun(); return;
     case 'start-force': startRun(); return;
+    case 'close-banner': S.bannerClosed = true; render(); return;
     case 'goto-setup': S.screen = 'setup'; S.confirm = null; render(); window.scrollTo(0, 0); return;
     case 'resume': S.screen = 'quiz'; S.confirm = null; render(); window.scrollTo(0, 0); return;
     case 'ask': S.confirm = b.dataset.what || null; S.resetText = ''; render();
@@ -672,6 +731,7 @@ document.addEventListener('click', e => {
   savePrefs(); render();
 });
 
+let selTimer;
 function toggleOpt(i) {
   const r = S.run, q = currentQ();
   if (!q || r.log[r.pos]) return;
@@ -681,6 +741,10 @@ function toggleOpt(i) {
   document.querySelectorAll('.opt').forEach(el => el.setAttribute('aria-pressed', String(S.sel.includes(+el.dataset.i))));
   const sb = $('[data-action="submit"]');
   if (sb) sb.disabled = !S.sel.length;
+  // keep the ticked options too, so another device opens on exactly the same screen
+  clearTimeout(selTimer);
+  const runId = r.id, pos = r.pos;
+  selTimer = setTimeout(() => { if (S.run.id === runId && S.run.pos === pos && !S.run.log[pos]) { S.run.sel = S.sel.slice(); store.save('run'); } }, 800);
 }
 
 document.addEventListener('input', e => {
