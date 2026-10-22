@@ -26,6 +26,7 @@
   --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --r: 12px;
+  --qs: 1;   /* question-screen text scale, set from the A− / A+ buttons */
   --r-sm: 8px;
 }
 @media (prefers-color-scheme: dark) {
@@ -210,14 +211,22 @@ main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); letter-spacing: .02em; }
 .badge.kind { background: var(--accent-soft); color: var(--accent); }
-.scenario { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 8px 12px; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: 15px; line-height: 1.4; }
-.qtext { font-family: var(--f-display); font-weight: 600; font-size: clamp(18px, 4.9vw, 25px); line-height: 1.25; }
-.qtext .ru { font-family: var(--f-body); font-weight: 400; font-size: 15px; }
+.scenario { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 8px 12px; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: calc(15px * var(--qs)); line-height: 1.4; }
+.qtext { font-family: var(--f-display); font-weight: 600; font-size: calc(clamp(18px, 4.9vw, 25px) * var(--qs)); line-height: 1.25; }
+.qtext .ru { font-family: var(--f-body); font-weight: 400; font-size: .7em; }
+.qtext.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+.more-btn { align-self: flex-start; margin-top: -6px; border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+.font-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; background: var(--surface); }
+.font-ctl button { border: 0; background: none; min-width: 40px; min-height: 32px; font: 700 14px/1 var(--f-body); color: var(--ink); }
+.font-ctl button + button { border-left: 1px solid var(--line); font-size: 17px; }
+.font-ctl button:disabled { opacity: .35; cursor: default; }
+.font-ctl sup { font-size: .65em; }
+@media (max-width: 440px) { .qmode { display: none; } }
 .opts { display: flex; flex-direction: column; gap: 6px; }
-.opt { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 9px 12px; min-height: 46px;
-  border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); font-size: 15px; line-height: 1.35; transition: border-color .15s, background .15s; }
+.opt { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; width: 100%; text-align: left; padding: 9px 12px; min-height: 46px;
+  border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); font-size: calc(15px * var(--qs)); line-height: 1.35; transition: border-color .15s, background .15s; }
 .opt:hover:not(:disabled) { border-color: var(--muted); }
-.opt .mk { width: 24px; height: 24px; display: grid; place-items: center; border: 2px solid var(--muted); font: 600 12px/1 var(--f-mono); color: var(--muted); }
+.opt .mk { margin-top: 1px; width: 24px; height: 24px; display: grid; place-items: center; border: 2px solid var(--muted); font: 600 12px/1 var(--f-mono); color: var(--muted); }
 .opt .mk.round { border-radius: 50%; }
 .opt .mk.square { border-radius: 6px; }
 .opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
@@ -247,7 +256,7 @@ main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-
 .verdict .vi svg { width: 16px; height: 16px; }
 .verdict strong { font-family: var(--f-display); font-size: 17px; display: block; line-height: 1.2; }
 .verdict small { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.3; }
-.explain { font-size: 14px; color: var(--ink-2); padding: 0 2px; }
+.explain { font-size: calc(14px * var(--qs)); color: var(--ink-2); padding: 0 2px; }
 @keyframes pop { from { transform: scale(.97); opacity: .4; } to { transform: none; opacity: 1; } }
 .shake { animation: shake .35s; }
 @keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }

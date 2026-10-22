@@ -4,10 +4,13 @@
 /* ---------- question bank (inlined by build.mjs from questions/questions.json) ---------- */
 const QUESTIONS = /*@QUESTIONS*/[];
 
-const BUILD = /*@BUILD*/{ version: 'dev', builtAt: 0 };   // stamped by build.mjs from package.json and the build time
+// stamped by build.mjs: version from package.json, build time, and a fingerprint of the question bank
+const BUILD = /*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev' };
 const MASTERED_STREAK = 2;      // correct answers in a row that mark a question as learned
 const HISTORY_LIMIT = 300;      // finished runs kept in the shared document
 const COUNT_MIN = 10, COUNT_MAX = 100;
+const FONT_STEPS = [0.85, 1, 1.15, 1.3, 1.5];   // text size of the question screen, chosen with A− / A+
+const LONG_TEXT = 260;                            // question longer than this (characters) starts collapsed
 
 /* ---------- self-snapshot: the page carries the latest shared state inside itself ----------
    PAGE is this page's own source with two tokens (filled in by build.mjs); SKELETON_HEAD is the
@@ -55,7 +58,7 @@ const CATS = [...new Set(QS.map(q => q.category))];
 const KINDS = [
   { id: 'single', cs: 'Jedna odpověď', ru: 'Один ответ' },
   { id: 'multi', cs: 'Více odpovědí', ru: 'Несколько ответов' },
-  { id: 'situation', cs: 'Situace', ru: 'Ситуации' },
+  { id: 'situation', cs: 'Případové studie', ru: 'Кейсы' },
 ];
 const HINT_EASY = 'У каждого вопроса написано, сколько в нём правильных ответов. Ответ засчитывается сразу: в вопросе с одним ответом — по первому нажатию, с несколькими — как только отмечено нужное число вариантов.';
 const HINT_HARD = 'Не видно, сколько ответов правильные. Отметьте все варианты, которые считаете верными, и нажмите «Ответить».';
@@ -72,10 +75,11 @@ const MODES = {
 };
 
 /* ---------- state ---------- */
-const emptyProgress = () => ({ v: 1, q: {}, history: [], updatedAt: 0 });
+const emptyProgress = () => ({ v: 1, q: {}, history: [], bank: { id: BUILD.bank, builtAt: BUILD.builtAt }, updatedAt: 0 });
 const emptyRun = () => ({ active: false, updatedAt: 0 });
 const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20 };
-const prefs = Object.assign({ sound: true, ru: false }, lsGet('cztest:prefs') || {});
+const prefs = Object.assign({ sound: true, ru: false, font: 1 }, lsGet('cztest:prefs') || {});
+if (!FONT_STEPS.includes(prefs.font)) prefs.font = 1;
 prefs.cfg = Object.assign({}, DEFAULT_CFG, prefs.cfg || {});
 prefs.cfg.cats = prefs.cfg.cats.filter(c => CATS.includes(c));
 if (!MODES[prefs.cfg.mode]) prefs.cfg.mode = 'snowball';
@@ -185,6 +189,7 @@ const store = {
     clearTimeout(this.pollTimer);
     if (local) { S.progress = clone(local.progress || emptyProgress()); S.run = clone(local.run || emptyRun()); S.sel = S.run.sel || []; }
     this.mode = 'local';
+    checkBank();
     this.persistLocal();
     if (S.run.active && !S.run.finished) S.screen = 'quiz';
     renderChrome(); render();
@@ -207,6 +212,7 @@ const store = {
       if (this.writing[key] && !first) return;   // our own newer write is on its way
       S[key] = clone(d);
     } else return;
+    if (key === 'progress' && !checkBank()) return;
     lsSet('cztest:mirror', { progress: S.progress, run: S.run });
     onRemoteChange(key, first);
   },
@@ -293,6 +299,26 @@ const snapshot = {
     finally { this.busy = false; }
   },
 };
+
+/* Progress belongs to one question bank. When the bank changes (a new questions.json), the first
+   page built with it starts the progress over; a page still running an older bank leaves the shared
+   progress alone and asks to be reloaded. Returns false when this page is the outdated one. */
+function checkBank() {
+  const b = S.progress.bank;
+  if (b && b.id === BUILD.bank) return true;
+  const hasData = b || Object.keys(S.progress.q || {}).length || (S.progress.history || []).length || S.run.active;
+  if (!hasData) { S.progress.bank = { id: BUILD.bank, builtAt: BUILD.builtAt }; return true; }
+  if (b && (b.builtAt || 0) > BUILD.builtAt) {
+    store.reason = 'stale';
+    store.useLocalFromCurrent();
+    return false;
+  }
+  S.progress = emptyProgress(); S.run = emptyRun(); S.sel = []; S.screen = 'setup'; S.lastRunSig = runSig();
+  store.seen.run = true;   // an older run arriving later must not count as the first snapshot
+  store.save('progress'); store.save('run');
+  setTimeout(() => { render(); toast('Вопросы обновлены — прогресс начат заново.'); }, 0);
+  return true;
+}
 
 function onRemoteChange(key, first) {
   if (key === 'run') {
@@ -438,6 +464,7 @@ function playSound(ok) {
 function renderChrome() {
   const app = $('#app');
   app.classList.toggle('show-ru', !!prefs.ru);
+  app.style.setProperty('--qs', prefs.font);
   $('#ru-switch').setAttribute('aria-checked', String(!!prefs.ru));
   const sb = $('#sound-btn');
   sb.setAttribute('aria-checked', String(!!prefs.sound));
@@ -470,6 +497,8 @@ function localBanner() {
       Обновите страницу, когда появится интернет.`,
     noconfig: `<strong>Общий прогресс не подключён.</strong>
       В <b>config.json</b> не указан адрес веб-приложения Apps Script, поэтому ответы сохраняются только в этом браузере.`,
+    stale: `<strong>Вышла новая версия вопросов.</strong>
+      Обновите страницу, чтобы продолжить с общим прогрессом. Пока ответы сохраняются только в этом браузере.`,
     nodb: `<strong>Прогресс сохраняется только в этом браузере.</strong>
       Общий прогресс доступен, только если открыть ссылку <b>claude.ai/artifact/…</b> после входа в аккаунт claude.ai.
       Здесь тест продолжается с последнего общего сохранения, но новые ответы в общий прогресс не попадут.`,
@@ -617,7 +646,11 @@ function viewQuiz() {
   <div class="quiz">
     <div class="qhead">
       <span class="pos">${inFix ? 'Исправление' : `${r.pos + 1} / ${r.main}`}</span>
-      <span>${esc(MODES[r.mode]?.ru || '')} · ${r.hard ? 'сложный' : 'лёгкий'}</span>
+      <span class="qmode">${esc(MODES[r.mode]?.ru || '')} · ${r.hard ? 'сложный' : 'лёгкий'}</span>
+      <span class="font-ctl" role="group" aria-label="Размер текста">
+        <button type="button" data-action="font" data-dir="-1" aria-label="Уменьшить текст" ${prefs.font <= FONT_STEPS[0] ? 'disabled' : ''}>A<sup>−</sup></button>
+        <button type="button" data-action="font" data-dir="1" aria-label="Увеличить текст" ${prefs.font >= FONT_STEPS[FONT_STEPS.length - 1] ? 'disabled' : ''}>A<sup>+</sup></button>
+      </span>
       <span style="margin-left:auto" class="row">
         <span class="score ok" title="Верно с первой попытки">${ICON.check}${r.firstOk}</span>
         <span class="score bad" title="Ошибки">${ICON.cross}${r.firstBad}</span>
@@ -625,9 +658,14 @@ function viewQuiz() {
     </div>
     <div class="pbar" aria-hidden="true"><i style="width:${pct(mainDone, r.main)}%"></i></div>
     ${inFix ? `<div class="phase">${L(`Oprava chyb: ${answered ? 'zbývá ještě' : 'zbývá'} ${left}. Test skončí, až všechny chyby opravíte.`, `Работа над ошибками: осталось ${left}. Тест закончится, когда все ошибки будут исправлены.`)}</div>` : ''}
-    <div class="badges"><span class="badge">${esc(q.category)}</span>${q.kind === 'situation' ? '<span class="badge">Ситуация</span>' : ''}${kindBadge}</div>
+    <div class="badges"><span class="badge">${esc(q.category)}</span>${q.case ? `<span class="badge">Кейс ${esc(q.case)}</span>` : q.kind === 'situation' ? '<span class="badge">Ситуация</span>' : ''}${kindBadge}</div>
     ${q.scenario ? `<div class="scenario">${tx(q.scenario)}</div>` : ''}
-    <h2 class="qtext">${tx(q.question)}</h2>
+    ${(() => {
+      const long = T(q.question).cs.length > LONG_TEXT;
+      const open = !long || S.qOpen === `${r.id}:${r.pos}`;
+      return `<h2 class="qtext ${open ? '' : 'clamped'}" id="qtext">${tx(q.question)}</h2>
+        ${long ? `<button type="button" class="more-btn" data-action="qtoggle" aria-controls="qtext" aria-expanded="${open}">${open ? 'Свернуть вопрос' : 'Показать вопрос полностью'}</button>` : ''}`;
+    })()}
     <div class="opts">${opts}</div>
     ${bar}
     ${explanation}
@@ -796,6 +834,15 @@ document.addEventListener('click', e => {
       startRun(); return;
     case 'start-force': startRun(); return;
     case 'hint': S.hintOpen = !S.hintOpen; render(); return;
+    case 'font': {
+      const i = FONT_STEPS.indexOf(prefs.font) + Number(b.dataset.dir);
+      prefs.font = FONT_STEPS[clamp(i, 0, FONT_STEPS.length - 1)];
+      savePrefs(); render(); return;
+    }
+    case 'qtoggle': {
+      const key = `${S.run.id}:${S.run.pos}`;
+      S.qOpen = S.qOpen === key ? null : key; render(); return;
+    }
     case 'close-banner': S.bannerClosed = true; render(); return;
     case 'goto-setup': S.screen = 'setup'; S.confirm = null; render(); window.scrollTo(0, 0); return;
     case 'resume': S.screen = 'quiz'; S.confirm = null; render(); window.scrollTo(0, 0); return;

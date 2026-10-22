@@ -3,6 +3,7 @@
 //   --snapshot embeds { progress, run } (the artifact's quiz/progress and quiz/run documents) so the page opens there.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +22,8 @@ const jsonForScript = v => JSON.stringify(v).replace(/</g, '\\u003c');
 const snapshot = snapPath ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
 const config = existsSync(join(root, 'config.json')) ? JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) : {};
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const build = { version: pkg.version, builtAt: Date.now() };   // shown at the bottom of every screen
+// shown at the bottom of every screen; `bank` tells the page when progress belongs to another question set
+const build = { version: pkg.version, builtAt: Date.now(), bank: createHash('sha256').update(JSON.stringify(questions)).digest('hex').slice(0, 12) };
 const skeletonHead = readFileSync(join(root, 'src', 'skeleton-head.html'), 'utf8');
 
 // Artifact build: the artifact service adds the document skeleton itself; the page can republish
@@ -40,7 +42,7 @@ function assemble(target) {
     .replace('/*@QUESTIONS*/[]', () => jsonForScript(questions))
     .replace('/*@SKELETON_HEAD*/""', () => target === 'artifact' ? jsonForScript(skeletonHead) : '""')
     .replace('/*@TARGET*/"artifact"', () => JSON.stringify(target))
-    .replace("/*@BUILD*/{ version: 'dev', builtAt: 0 }", () => JSON.stringify(build))
+    .replace("/*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev' }", () => JSON.stringify(build))
     .replace('/*@REMOTE_URL*/""', () => jsonForScript(target === 'pages' ? (config.appsScriptUrl || '') : ''))
     .replace('/*@PAGE*/""', () => TOK_PAGE);
   return readFileSync(join(root, 'src', 'template.html'), 'utf8')
@@ -71,6 +73,7 @@ function validate(qs) {
     if (q.type && !['single', 'multi', 'situation'].includes(q.type)) fail(`${at}: "type" must be single, multi or situation`);
     text(q.question, `${at} question`);
     if (q.scenario) text(q.scenario, `${at} scenario`);
+    if (q.case != null && typeof q.case !== 'string') fail(`${at}: "case" must be a string id`);
     if (q.explanation) text(q.explanation, `${at} explanation`);
     if (!Array.isArray(q.options) || q.options.length < 2) fail(`${at}: needs at least 2 options`);
     q.options.forEach((o, i) => text(o, `${at} option ${i}`));

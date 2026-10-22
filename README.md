@@ -52,6 +52,16 @@ ze stránky znovu publikuje s aktuálním stavem, takže i bez přístupu k data
 claude.ai) se test otevře tam, kde skončil. Před ručním publikováním nové verze uložte dokumenty `quiz/progress`
 a `quiz/run` do `state.json` jako `{ "progress": …, "run": … }` a sestavte `node build.mjs --snapshot state.json`.
 
+### Новые вопросы
+Исходный файл экзамена кладётся в `questions/source/questions.json`, тексты кейсов (если есть) в
+`questions/source/cases.json` (`{ "номер кейса": "текст" }`). Затем:
+```sh
+node scripts/import-questions.mjs   # → questions/questions.json
+node build.mjs
+```
+Когда набор вопросов меняется, сайт при первом открытии сам начинает общий прогресс заново: у прогресса
+хранится отпечаток набора вопросов. Чистить таблицу вручную не нужно.
+
 ## Formát otázek (`questions/questions.json`)
 
 ```json
