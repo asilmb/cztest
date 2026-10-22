@@ -1,58 +1,52 @@
-// Converts the exam export (questions/source/questions.json) into the trainer's format (questions/questions.json).
-// Source item: { id, section, case, text, options: [string], correct: [index] }; `case` is the id of a
-// case study shared by several questions. Case texts, when available, go in questions/source/cases.json
-// as { "<case id>": "text" } or { "<case id>": { "cs": "...", "ru": "..." } } and are shown above each of its questions.
-// Topics come from questions/source/topics.json ({ "<question id>": "<topic key>" }); a question without
-// one falls back to its exam section. Questions are written in topic order, which is the order of the
-// category chips in the app.
-// Usage: node scripts/import-questions.mjs
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+// Converts the exam export into the trainer's format (questions/questions.json).
+//   questions/source/questions.json  [{ id, section, case, text, options, correct }] — `case` is the id of
+//                                    the case study a question belongs to (section "Dovednosti")
+//   questions/source/cases.json      [{ id, section, text }] — the case study texts
+//   questions/source/topics.json     [{ section, key, cs, ru }] — topics, in the order the app lists them
+//   questions/source/assign.json     { questions: { <question id>: <topic key> }, cases: { <case id>: <topic key> } }
+// A case-study question takes its case's topic. Usage: node scripts/import-questions.mjs
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const src = JSON.parse(readFileSync(join(root, 'questions', 'source', 'questions.json'), 'utf8'));
-const casesPath = join(root, 'questions', 'source', 'cases.json');
-const cases = existsSync(casesPath) ? JSON.parse(readFileSync(casesPath, 'utf8')) : {};
-const topicsPath = join(root, 'questions', 'source', 'topics.json');
-const topics = existsSync(topicsPath) ? JSON.parse(readFileSync(topicsPath, 'utf8')) : {};
+const read = name => JSON.parse(readFileSync(join(root, 'questions', 'source', name), 'utf8'));
+const src = read('questions.json');
+const topics = read('topics.json');
+const assign = read('assign.json');
+// the export lost paragraph breaks ("…4+1.Kupní cena…"); put them back so the case reads in paragraphs
+const paragraphs = text => text.replace(/([.!?:])(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])/g, '$1\n').trim();
+const cases = Object.fromEntries(read('cases.json').map(c => [String(c.id), paragraphs(c.text)]));
+const topicByKey = Object.fromEntries(topics.map(t => [t.key, t]));
+const order = topics.map(t => t.key);
 
-const TOPICS = {
-  regulace: 'Участники рынка и надзор ČNB',
-  informace: 'Информирование и реклама',
-  smlouva: 'Договор о потребкредите',
-  uveruschopnost: 'Кредитоспособность и реестры',
-  matematika: 'Финансовая математика и RPSN',
-  produkty: 'Кредитные продукты',
-  nemovitosti: 'Недвижимость и обеспечение',
-  pravo: 'Гражданское право и споры',
-  pojisteni: 'Страхование',
-  ostatni: 'Налоги, AML и персональные данные',
-};
-const order = Object.keys(TOPICS);
-
+const problems = [];
 const out = src.map(q => {
+  const id = String(q.id);
+  const caseId = q.case ? String(q.case) : null;
+  const key = caseId ? assign.cases[caseId] : assign.questions[id];
+  const topic = topicByKey[key];
+  if (!topic) problems.push(`question ${id}: no topic`);
+  if (caseId && !cases[caseId]) problems.push(`question ${id}: case ${caseId} has no text`);
   const item = {
-    id: String(q.id),
-    category: TOPICS[topics[q.id]] || q.section,
-    type: q.case ? 'situation' : (q.correct.length > 1 ? 'multi' : 'single'),
+    id,
+    category: topic ? topic.ru : q.section,
+    section: q.section,
+    type: caseId ? 'situation' : (q.correct.length > 1 ? 'multi' : 'single'),
   };
-  if (q.case) {
-    item.case = String(q.case);
-    if (cases[q.case]) item.scenario = cases[q.case];
-  }
+  if (caseId) { item.case = caseId; item.scenario = cases[caseId] || ''; }
   item.question = q.text;
   item.options = q.options;
   item.correct = q.correct;
+  item.topic = key;
   return item;
 });
+if (problems.length) { console.error(problems.join('\n')); process.exit(1); }
 
-const rank = q => { const i = order.indexOf(topics[q.id]); return i < 0 ? order.length : i; };
-out.sort((a, b) => rank(a) - rank(b) || Number(a.id) - Number(b.id));
+const rank = q => order.indexOf(q.topic);
+out.sort((a, b) => rank(a) - rank(b) || Number(a.case || 0) - Number(b.case || 0) || Number(a.id) - Number(b.id));
+out.forEach(q => delete q.topic);
 writeFileSync(join(root, 'questions', 'questions.json'), JSON.stringify(out, null, 1) + '\n');
-const unknown = out.filter(q => !TOPICS[topics[q.id]]).length;
-if (unknown) console.warn(`${unknown} questions have no topic in questions/source/topics.json and keep their exam section`);
 const counts = {}; out.forEach(q => counts[q.category] = (counts[q.category] || 0) + 1);
+console.log(`Imported ${out.length} questions, ${Object.keys(cases).length} case studies`);
 console.table(counts);
-const missing = new Set(out.filter(q => q.case && !q.scenario).map(q => q.case));
-console.log(`Imported ${out.length} questions` + (missing.size ? `; ${missing.size} case studies have no text in questions/source/cases.json` : ''));

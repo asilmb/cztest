@@ -214,6 +214,10 @@ main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-
 .scenario { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 8px 12px; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: calc(15px * var(--qs)); line-height: 1.4; }
 .qtext { font-family: var(--f-display); font-weight: 600; font-size: calc(clamp(18px, 4.9vw, 25px) * var(--qs)); line-height: 1.25; }
 .qtext .ru { font-family: var(--f-body); font-weight: 400; font-size: .7em; }
+.scenario .t .cs, .scenario .t .ru { white-space: pre-line; }
+.sc-head { display: block; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.scenario.clamped .t { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.chip-group { margin: 12px 0 6px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
 .qtext.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
 .more-btn { align-self: flex-start; margin-top: -6px; border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 .font-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; background: var(--surface); }

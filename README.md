@@ -53,14 +53,18 @@ claude.ai) se test otevře tam, kde skončil. Před ručním publikováním nov�
 a `quiz/run` do `state.json` jako `{ "progress": …, "run": … }` a sestavte `node build.mjs --snapshot state.json`.
 
 ### Новые вопросы
-Исходный файл экзамена кладётся в `questions/source/questions.json`, тексты кейсов (если есть) в
-`questions/source/cases.json` (`{ "номер кейса": "текст" }`). Затем:
+Исходные файлы лежат в `questions/source/`:
+- `questions.json` — вопросы экзамена (`id, section, case, text, options, correct`);
+- `cases.json` — тексты кейсов (`id, section, text`);
+- `topics.json` — темы с названиями на чешском и русском, в порядке показа;
+- `assign.json` — тема каждого вопроса (`questions`) и каждого кейса (`cases`).
+
 ```sh
 node scripts/import-questions.mjs   # → questions/questions.json
 node build.mjs
 ```
-Когда набор вопросов меняется, сайт при первом открытии сам начинает общий прогресс заново: у прогресса
-хранится отпечаток набора вопросов. Чистить таблицу вручную не нужно.
+Прогресс сбрасывается сам, только если меняется набор вопросов или правильные ответы (отпечаток по id и ответам).
+Перегруппировка и правка формулировок прогресс не трогают.
 
 ## Formát otázek (`questions/questions.json`)
 

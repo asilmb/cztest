@@ -55,6 +55,12 @@ const kindOf = q => q.type === 'situation' || q.scenario ? 'situation' : (q.corr
 const QS = QUESTIONS.map(q => ({ ...q, correct: [...q.correct].sort((a, b) => a - b) })).map(q => ({ ...q, kind: kindOf(q) }));
 const QMAP = Object.fromEntries(QS.map(q => [q.id, q]));
 const CATS = [...new Set(QS.map(q => q.category))];
+// exam sections group the categories: knowledge questions and case studies
+const SECTIONS = [{ id: 'Znalosti', ru: 'Знания' }, { id: 'Dovednosti', ru: 'Кейсы' }];
+const sectionOf = cat => QS.find(q => q.category === cat)?.section || '';
+const CASE_CATS = CATS.filter(c => QS.some(q => q.category === c && q.case));
+const CASES = {};   // case id -> its question ids, in exam order
+QS.forEach(q => { if (q.case) (CASES[q.case] = CASES[q.case] || []).push(q.id); });
 const KINDS = [
   { id: 'single', cs: 'Jedna odpověď', ru: 'Один ответ' },
   { id: 'multi', cs: 'Více odpovědí', ru: 'Несколько ответов' },
@@ -69,6 +75,8 @@ const MODES = {
   errors: { cs: 'Oprava chyb', ru: 'Работа над ошибками',
     dcs: 'Jen otázky, ve kterých jste někdy chybovali. Nejčastěji přijdou ty, které vám jdou nejhůř.',
     dru: 'Только вопросы, в которых вы ошибались. Чаще всего попадаются самые трудные для вас.' },
+  cases: { cs: 'Případové studie', ru: 'Кейсы',
+    dcs: '', dru: 'Условие кейса и все его вопросы подряд. Сначала кейсы, которые вы решали реже всего.' },
   review: { cs: 'Opakování', ru: 'Заучивание',
     dcs: 'Upevňuje otázky, které už vám jdou. Nejdřív ty, které jste nejdéle neviděli.',
     dru: 'Закрепляет вопросы, которые уже получаются. Сначала те, что вы давно не видели.' },
@@ -77,7 +85,7 @@ const MODES = {
 /* ---------- state ---------- */
 const emptyProgress = () => ({ v: 1, q: {}, history: [], bank: { id: BUILD.bank, builtAt: BUILD.builtAt }, updatedAt: 0 });
 const emptyRun = () => ({ active: false, updatedAt: 0 });
-const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20 };
+const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20, caseCount: 3 };
 const prefs = Object.assign({ sound: true, ru: false, font: 1 }, lsGet('cztest:prefs') || {});
 if (!FONT_STEPS.includes(prefs.font)) prefs.font = 1;
 prefs.cfg = Object.assign({}, DEFAULT_CFG, prefs.cfg || {});
@@ -354,6 +362,11 @@ const difficulty = s => (1 + 2 * s.w) / (1 + s.r) * (s.k >= MASTERED_STREAK ? 0.
 
 /* ---------- picking questions for a run ---------- */
 function filtered(cfg) {
+  if (cfg.mode === 'cases') {
+    // only case topics count here; none of them picked means all cases
+    const cats = cfg.cats.filter(c => CASE_CATS.includes(c));
+    return QS.filter(q => q.case && (!cats.length || cats.includes(q.category)));
+  }
   return QS.filter(q => (!cfg.cats.length || cfg.cats.includes(q.category)) && (!cfg.kinds.length || cfg.kinds.includes(q.kind)));
 }
 function poolFor(mode, list) {
@@ -361,7 +374,15 @@ function poolFor(mode, list) {
   if (mode === 'review') return list.filter(q => (st(q.id)?.r || 0) > 0);
   return list;
 }
+const casesIn = list => [...new Set(list.filter(q => q.case).map(q => q.case))];
+// how many units the slider counts: case studies in the case mode, questions otherwise
+const availFor = (mode, list) => mode === 'cases' ? casesIn(list).length : poolFor(mode, list).length;
 function pick(mode, list, n) {
+  if (mode === 'cases') {
+    // least practised cases first; a case keeps its questions together and in order
+    const seen = id => CASES[id].reduce((a, qid) => a + (st(qid)?.s || 0), 0) / CASES[id].length;
+    return shuffle(casesIn(list)).sort((a, b) => seen(a) - seen(b)).slice(0, n).flatMap(id => CASES[id]);
+  }
   const pool = poolFor(mode, list);
   let ranked;
   if (mode === 'errors') {
@@ -374,19 +395,20 @@ function pick(mode, list, n) {
   }
   return shuffle(ranked.slice(0, n));
 }
-function countBounds(avail) {
+function countBounds(avail, mode) {
   const max = Math.min(COUNT_MAX, avail);
-  return { min: Math.min(COUNT_MIN, max), max };
+  return { min: mode === 'cases' ? Math.min(1, max) : Math.min(COUNT_MIN, max), max };
 }
+const cfgCount = cfg => cfg.mode === 'cases' ? cfg.caseCount : cfg.count;
 
 /* ---------- run lifecycle ---------- */
 function startRun() {
   const cfg = prefs.cfg;
   const list = filtered(cfg);
-  const avail = poolFor(cfg.mode, list).length;
+  const avail = availFor(cfg.mode, list);
   if (!avail) return;
-  const { min, max } = countBounds(avail);
-  const ids = pick(cfg.mode, list, clamp(cfg.count, min, max));
+  const { min, max } = countBounds(avail, cfg.mode);
+  const ids = pick(cfg.mode, list, clamp(cfgCount(cfg), min, max));
   S.run = {
     active: true, id: Date.now().toString(36), startedAt: Date.now(), mode: cfg.mode, hard: cfg.hard,
     cats: cfg.cats.slice(), kinds: cfg.kinds.slice(), main: ids.length, order: ids, pos: 0, log: [],
@@ -529,9 +551,10 @@ function render() {
 function viewSetup() {
   const cfg = prefs.cfg;
   const list = filtered(cfg);
-  const avail = poolFor(cfg.mode, list).length;
-  const { min, max } = countBounds(avail);
-  const count = clamp(cfg.count, min, max);
+  const isCases = cfg.mode === 'cases';
+  const avail = availFor(cfg.mode, list);
+  const { min, max } = countBounds(avail, cfg.mode);
+  const count = clamp(cfgCount(cfg), min, max);
   const r = S.run;
   const resume = r.active && !r.finished ? `
     <div class="card resume stack">
@@ -548,18 +571,24 @@ function viewSetup() {
         <div class="row"><button type="button" class="btn danger sm" data-action="discard">Да, удалить</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Нет</button></div></div>` : ''}
     </div>` : '';
 
-  const catChips = [`<button type="button" class="chip" data-action="cat" data-cat="" aria-pressed="${!cfg.cats.length}">${L('Všechny kategorie', 'Все категории')} <span class="count">${QS.length}</span></button>`]
-    .concat(CATS.map(c => {
-      const n = QS.filter(q => q.category === c).length;
-      const done = QS.filter(q => q.category === c && statusOf(q.id) === 'done').length;
-      return `<button type="button" class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${cfg.cats.includes(c)}">${esc(c)} <span class="count">${done}/${n}</span></button>`;
-    })).join('');
+  const chip = c => {
+    const n = QS.filter(q => q.category === c).length;
+    const done = QS.filter(q => q.category === c && statusOf(q.id) === 'done').length;
+    return `<button type="button" class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${cfg.cats.includes(c)}">${esc(c)} <span class="count">${done}/${n}</span></button>`;
+  };
+  const shownCats = isCases ? CASE_CATS : CATS;
+  const noneShown = !cfg.cats.some(c => shownCats.includes(c));
+  const allChip = `<button type="button" class="chip" data-action="cat" data-cat="" aria-pressed="${noneShown}">${isCases ? 'Все кейсы' : 'Все категории'} <span class="count">${isCases ? Object.keys(CASES).length + ' кейсов' : QS.length}</span></button>`;
+  const catChips = `<div class="chips">${allChip}</div>` + SECTIONS
+    .filter(sec => !isCases || sec.id === 'Dovednosti')
+    .map(sec => { const cats = shownCats.filter(c => sectionOf(c) === sec.id); return cats.length ? `${isCases ? '' : `<p class="chip-group">${esc(sec.ru)}</p>`}<div class="chips">${cats.map(chip).join('')}</div>` : ''; })
+    .join('');
   const kindChips = KINDS.map(k => `<button type="button" class="chip" data-action="kind" data-kind="${k.id}" aria-pressed="${!cfg.kinds.length || cfg.kinds.includes(k.id)}">${L(k.cs, k.ru)} <span class="count">${QS.filter(q => q.kind === k.id).length}</span></button>`).join('');
 
   const modeCards = Object.entries(MODES).map(([id, m]) => {
-    const a = poolFor(id, list).length;
+    const a = availFor(id, filtered({ ...cfg, mode: id }));
     return `<button type="button" class="mode" role="radio" data-action="mode" data-mode="${id}" aria-checked="${cfg.mode === id}">
-      <span class="dot"></span><b>${L(m.cs, m.ru)}</b><span class="avail">${nQ(a)}</span>
+      <span class="dot"></span><b>${L(m.cs, m.ru)}</b><span class="avail">${id === 'cases' ? `${a} ${plural(a, 'кейс', 'кейса', 'кейсов')}` : nQ(a)}</span>
       <span class="desc">${L(m.dcs, m.dru)}</span></button>`;
   }).join('');
 
@@ -573,8 +602,8 @@ function viewSetup() {
     <div class="stack">
       ${resume}
       <section class="card stack">
-        <div><p class="section-label">${L('Kategorie', 'Категории')}</p><div class="chips">${catChips}</div></div>
-        <div><p class="section-label">${L('Typ otázek', 'Тип вопросов')}</p><div class="chips">${kindChips}</div></div>
+        <div><p class="section-label">${isCases ? 'Темы кейсов' : 'Категории'}</p>${catChips}</div>
+        ${isCases ? '' : `<div><p class="section-label">${L('Typ otázek', 'Тип вопросов')}</p><div class="chips">${kindChips}</div></div>`}
       </section>
     </div>
     <div class="stack">
@@ -593,12 +622,14 @@ function viewSetup() {
             : L('', 'Видно, сколько ответов правильные. Ответ засчитывается сразу по нажатию.')}</p>
         </div>
         <div>
-          <p class="section-label">${L('Počet otázek', 'Количество вопросов')}</p>
+          <p class="section-label">${isCases ? 'Количество кейсов' : 'Количество вопросов'}</p>
           ${avail ? `<div class="count-row">
-            <input type="range" id="count" min="${min}" max="${max}" step="1" value="${count}" ${min === max ? 'disabled' : ''} aria-label="Количество вопросов">
+            <input type="range" id="count" min="${min}" max="${max}" step="1" value="${count}" ${min === max ? 'disabled' : ''} aria-label="${isCases ? 'Количество кейсов' : 'Количество вопросов'}">
             <span class="count-val" id="count-val">${count}</span>
           </div>
-          <p class="small muted" style="margin:6px 0 0">Доступно: ${nQ(avail)}${avail < COUNT_MIN ? ' — в тест попадут все' : ''}.</p>` : `<div class="empty">${emptyMsg}</div>`}
+          <p class="small muted" style="margin:6px 0 0">${isCases
+            ? `Доступно кейсов: ${avail}. В каждом кейсе 5 вопросов.`
+            : `Доступно: ${nQ(avail)}${avail < COUNT_MIN ? ' — в тест попадут все' : ''}.`}</p>` : `<div class="empty">${emptyMsg}</div>`}
         </div>
         ${S.confirm === 'replace' ? `<div class="confirm"><span>${L('Nový test nahradí rozpracovaný. Pokračovat?', 'Новый тест заменит незавершённый. Продолжить?')}</span>
           <div class="row"><button type="button" class="btn danger sm" data-action="start-force">Да, начать новый</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Нет</button></div></div>` : ''}
@@ -664,8 +695,17 @@ function viewQuiz() {
     </div>
     <div class="pbar" aria-hidden="true"><i style="width:${pct(mainDone, r.main)}%"></i></div>
     ${inFix ? `<div class="phase">${L(`Oprava chyb: ${answered ? 'zbývá ještě' : 'zbývá'} ${left}. Test skončí, až všechny chyby opravíte.`, `Работа над ошибками: осталось ${left}. Тест закончится, когда все ошибки будут исправлены.`)}</div>` : ''}
-    <div class="badges"><span class="badge">${esc(q.category)}</span>${q.case ? `<span class="badge">Кейс ${esc(q.case)}</span>` : q.kind === 'situation' ? '<span class="badge">Ситуация</span>' : ''}${kindBadge}</div>
-    ${q.scenario ? `<div class="scenario">${tx(q.scenario)}</div>` : ''}
+    <div class="badges"><span class="badge">${esc(q.category)}</span>${q.case && !q.scenario ? `<span class="badge">Кейс ${esc(q.case)}</span>` : q.kind === 'situation' && !q.case ? '<span class="badge">Ситуация</span>' : ''}${kindBadge}</div>
+    ${q.scenario ? (() => {
+      // the case text opens in full on the first question of a case, and collapsed on the ones after it
+      const prev = r.order[r.pos - 1] && QMAP[r.order[r.pos - 1]];
+      const firstOfCase = !prev || prev.case !== q.case;
+      const key = `${r.id}:${r.pos}`;
+      const open = S.scToggle === key ? !firstOfCase : firstOfCase;
+      const ids = CASES[q.case] || [], n = ids.indexOf(q.id) + 1;
+      return `<div class="scenario ${open ? '' : 'clamped'}" id="scenario"><span class="sc-head">Кейс ${esc(q.case)}${n ? ` · вопрос ${n} из ${ids.length}` : ''}</span>${tx(q.scenario)}</div>
+        <button type="button" class="more-btn" data-action="sctoggle" aria-controls="scenario" aria-expanded="${open}">${open ? 'Свернуть условие' : 'Показать условие кейса'}</button>`;
+    })() : ''}
     ${(() => {
       const long = T(q.question).cs.length > LONG_TEXT;
       const open = !long || S.qOpen === `${r.id}:${r.pos}`;
@@ -738,11 +778,12 @@ function viewStats() {
     <span><i class="sw s-err"></i>Ошибки к исправлению <b class="num">${c.err}</b></span>
     <span><i class="sw s-new"></i>Без ответа <b class="num">${c.new}</b></span></div>`;
 
-  const cats = CATS.map(cat => {
+  const catRow = cat => {
     const qs = QS.filter(q => q.category === cat);
     const cc = statusCounts(qs);
     return `<div class="cat-row"><span>${esc(cat)}</span><span class="num">${cc.done}/${qs.length}</span>${statBar(cc, qs.length, 'sm')}</div>`;
-  }).join('');
+  };
+  const cats = SECTIONS.map(sec => { const list = CATS.filter(c => sectionOf(c) === sec.id); return list.length ? `<p class="chip-group">${esc(sec.ru)}</p>${list.map(catRow).join('')}` : ''; }).join('');
 
   const chart = recent.length ? `
     <div class="chart">
@@ -821,7 +862,7 @@ document.addEventListener('click', e => {
       S.confirm = null; render(); window.scrollTo(0, 0); return;
     case 'cat': {
       const c = b.dataset.cat;
-      if (!c) cfg.cats = [];
+      if (!c) cfg.cats = cfg.mode === 'cases' ? cfg.cats.filter(x => !CASE_CATS.includes(x)) : [];
       else cfg.cats = cfg.cats.includes(c) ? cfg.cats.filter(x => x !== c) : [...cfg.cats, c];
       if (cfg.cats.length === CATS.length) cfg.cats = [];
       break;
@@ -844,6 +885,10 @@ document.addEventListener('click', e => {
       const i = FONT_STEPS.indexOf(prefs.font) + Number(b.dataset.dir);
       prefs.font = FONT_STEPS[clamp(i, 0, FONT_STEPS.length - 1)];
       savePrefs(); render(); return;
+    }
+    case 'sctoggle': {
+      const key = `${S.run.id}:${S.run.pos}`;
+      S.scToggle = S.scToggle === key ? null : key; render(); return;
     }
     case 'qtoggle': {
       const key = `${S.run.id}:${S.run.pos}`;
@@ -895,7 +940,7 @@ function toggleOpt(i) {
 
 document.addEventListener('input', e => {
   if (e.target.id === 'count') {
-    prefs.cfg.count = +e.target.value; $('#count-val').textContent = e.target.value; savePrefs();
+    prefs.cfg[prefs.cfg.mode === 'cases' ? 'caseCount' : 'count'] = +e.target.value; $('#count-val').textContent = e.target.value; savePrefs();
   } else if (e.target.id === 'reset-input') {
     S.resetText = e.target.value;
     $('#reset-go').disabled = S.resetText.trim().toUpperCase() !== 'УДАЛИТЬ';
