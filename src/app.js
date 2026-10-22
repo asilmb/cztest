@@ -1,0 +1,731 @@
+(() => {
+'use strict';
+
+/* ---------- question bank (inlined by build.mjs from questions/questions.json) ---------- */
+const QUESTIONS = /*@QUESTIONS*/[];
+
+const MASTERED_STREAK = 2;      // correct answers in a row that mark a question as learned
+const HISTORY_LIMIT = 300;      // finished runs kept in the shared document
+const COUNT_MIN = 10, COUNT_MAX = 100;
+
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const T = t => typeof t === 'string' ? { cs: t, ru: '' } : { cs: t?.cs || '', ru: t?.ru || '' };
+const tx = (t, cls = '') => { const { cs, ru } = T(t); return `<span class="t ${cls}"><span class="cs">${esc(cs)}</span>${ru ? `<span class="ru" lang="ru">${esc(ru)}</span>` : ''}</span>`; };
+const L = (cs, ru, cls) => tx({ cs, ru }, cls);
+const clone = o => JSON.parse(JSON.stringify(o));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sameSet = (a, b) => a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } };
+const fmtDate = t => new Date(t).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const plural = (n, one, few, many) => n === 1 ? one : (n >= 2 && n <= 4 ? few : many);
+
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  soundOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>',
+  soundOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
+};
+
+/* ---------- questions ---------- */
+const kindOf = q => q.type === 'situation' || q.scenario ? 'situation' : (q.correct.length > 1 || q.type === 'multi' ? 'multi' : 'single');
+const QS = QUESTIONS.map(q => ({ ...q, correct: [...q.correct].sort((a, b) => a - b) })).map(q => ({ ...q, kind: kindOf(q) }));
+const QMAP = Object.fromEntries(QS.map(q => [q.id, q]));
+const CATS = [...new Set(QS.map(q => q.category))];
+const KINDS = [
+  { id: 'single', cs: 'Jedna odpověď', ru: 'Один ответ' },
+  { id: 'multi', cs: 'Více odpovědí', ru: 'Несколько ответов' },
+  { id: 'situation', cs: 'Situace', ru: 'Ситуации' },
+];
+const MODES = {
+  snowball: { cs: 'Sněhová koule', ru: 'Снежный ком',
+    dcs: 'Projede všechny otázky bez ohledu na výsledky. Přednost mají ty, které jste viděli nejméně.',
+    dru: 'Прокатывается по всем вопросам без оглядки на результаты. В приоритете те, что встречались реже всего.' },
+  errors: { cs: 'Oprava chyb', ru: 'Работа над ошибками',
+    dcs: 'Jen otázky, ve kterých jste někdy chybovali. Nejčastěji přijdou ty, které vám jdou nejhůř.',
+    dru: 'Только вопросы, в которых вы ошибались. Чаще всего попадаются самые трудные для вас.' },
+  review: { cs: 'Opakování', ru: 'Заучивание',
+    dcs: 'Upevňuje otázky, které už vám jdou. Nejdřív ty, které jste nejdéle neviděli.',
+    dru: 'Закрепляет вопросы, которые уже получаются. Сначала те, что вы давно не видели.' },
+};
+
+/* ---------- state ---------- */
+const emptyProgress = () => ({ v: 1, q: {}, history: [], updatedAt: 0 });
+const emptyRun = () => ({ active: false, updatedAt: 0 });
+const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20 };
+const prefs = Object.assign({ sound: true, ru: false }, lsGet('cztest:prefs') || {});
+prefs.cfg = Object.assign({}, DEFAULT_CFG, prefs.cfg || {});
+prefs.cfg.cats = prefs.cfg.cats.filter(c => CATS.includes(c));
+if (!MODES[prefs.cfg.mode]) prefs.cfg.mode = 'snowball';
+const S = {
+  progress: emptyProgress(),
+  run: emptyRun(),
+  screen: 'setup',
+  sel: [],               // current selection before answering (not persisted)
+  confirm: null,         // which inline confirmation is open
+  resetText: '',
+};
+const savePrefs = () => lsSet('cztest:prefs', prefs);
+
+/* ---------- storage: shared db when writable, this device otherwise ---------- */
+const store = {
+  mode: 'connecting',    // connecting | shared | readonly | local
+  db: null, refs: {}, unsubs: [], writing: {}, again: {}, seen: {}, dirty: {},
+
+  async init() {
+    const mirror = lsGet('cztest:mirror');
+    const local = lsGet('cztest:local');
+    if (mirror) { S.progress = mirror.progress || S.progress; S.run = mirror.run || S.run; }
+    let db = null;
+    try { db = window.claude?.use ? await window.claude.use('db') : null; } catch { db = null; }
+    if (!db) return this.useLocal(local);
+    let canWrite = null;
+    try { const user = await window.claude.use('user'); canWrite = user ? await user.can('data.write') : null; } catch { canWrite = null; }
+    if (canWrite === false && local) return this.useLocal(local);
+    this.db = db;
+    this.mode = canWrite === false ? 'readonly' : 'shared';
+    this.refs.progress = db.doc('quiz/progress');
+    this.refs.run = db.doc('quiz/run');
+    for (const key of ['progress', 'run']) {
+      this.unsubs.push(this.refs[key].onSnapshot(snap => this.onSnap(key, snap), () => this.useLocalFromCurrent()));
+    }
+    renderChrome();
+  },
+
+  useLocal(local) {
+    this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
+    this.unsubs = [];
+    if (local) { S.progress = local.progress || emptyProgress(); S.run = local.run || emptyRun(); }
+    this.mode = 'local';
+    this.persistLocal();
+    if (S.run.active && !S.run.finished) S.screen = 'quiz';
+    renderChrome(); render();
+  },
+
+  onSnap(key, snap) {
+    if (this.mode === 'local') return;
+    const d = snap.exists ? snap.data() : null;
+    const first = !this.seen[key];
+    this.seen[key] = true;
+    const cur = key === 'progress' ? S.progress : S.run;
+    if (first && this.dirty[key] && (cur.updatedAt || 0) > (d?.updatedAt || 0)) {
+      // answered while still connecting: push the newer local state instead of dropping it
+      this.dirty[key] = false;
+      if (this.mode === 'shared') this.flush(key); else this.useLocalFromCurrent();
+      return;
+    }
+    if (!d) { if (first) { S[key] = key === 'progress' ? emptyProgress() : emptyRun(); } else return; }
+    else if (first || (d.updatedAt || 0) >= (cur.updatedAt || 0)) {
+      if (this.writing[key] && !first) return;   // our own newer write is on its way
+      S[key] = clone(d);
+    } else return;
+    lsSet('cztest:mirror', { progress: S.progress, run: S.run });
+    onRemoteChange(key, first);
+  },
+
+  save(key) {
+    const obj = key === 'progress' ? S.progress : S.run;
+    obj.updatedAt = Date.now();
+    if (this.mode === 'readonly') { this.useLocalFromCurrent(); return; }
+    if (this.mode === 'connecting') { this.dirty[key] = true; lsSet('cztest:mirror', { progress: S.progress, run: S.run }); return; }
+    if (this.mode === 'local') { this.persistLocal(); return; }
+    lsSet('cztest:mirror', { progress: S.progress, run: S.run });
+    this.flush(key);
+  },
+
+  async flush(key) {
+    if (this.writing[key]) { this.again[key] = true; return; }
+    this.writing[key] = true;
+    try {
+      do {
+        this.again[key] = false;
+        await this.write(key);
+      } while (this.again[key]);
+    } catch (e) {
+      if (e?.code === 'invalid_argument' || e?.code === 'not_granted' || e?.code === 'revoked' || e?.code === 'capability_disabled') this.useLocalFromCurrent();
+      else toast('Uložení se nepovedlo. Zkuste to prosím znovu.');
+    } finally { this.writing[key] = false; }
+  },
+
+  async write(key) {
+    const data = clone(key === 'progress' ? S.progress : S.run);
+    try { await this.refs[key].set(data); }
+    catch (e) {
+      if (e?.code !== 'unavailable') throw e;
+      await new Promise(r => setTimeout(r, 600 + Math.random() * 900));
+      await this.refs[key].set(data);
+    }
+  },
+
+  useLocalFromCurrent() {
+    this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
+    this.unsubs = [];
+    this.mode = 'local';
+    this.persistLocal();
+    renderChrome();
+  },
+
+  persistLocal() { lsSet('cztest:local', { progress: S.progress, run: S.run }); },
+};
+
+function onRemoteChange(key, first) {
+  if (key === 'run') {
+    if (first && S.run.active && !S.run.finished) S.screen = 'quiz';
+    const sig = runSig();
+    if (sig !== S.lastRunSig) { S.lastRunSig = sig; S.sel = []; if (S.screen !== 'stats') render(); }
+  } else if (S.screen !== 'quiz' || first) render();
+  renderChrome();
+}
+const runSig = () => { const r = S.run; return r.active ? `${r.id}:${r.pos}:${r.order.length}:${(r.log || []).filter(Boolean).length}:${r.finished}` : 'none'; };
+
+/* ---------- per-question statistics ---------- */
+const st = id => S.progress.q[id];
+function statusOf(id) {
+  const s = st(id);
+  if (!s || !s.s) return 'new';
+  if (s.k >= MASTERED_STREAK) return 'done';
+  if (s.w > 0) return 'err';
+  return 'learn';
+}
+function record(id, ok) {
+  const s = S.progress.q[id] || (S.progress.q[id] = { s: 0, r: 0, w: 0, k: 0, t: 0 });
+  s.s++; s.t = Date.now();
+  if (ok) { s.r++; s.k++; } else { s.w++; s.k = 0; }
+}
+const difficulty = s => (1 + 2 * s.w) / (1 + s.r) * (s.k >= MASTERED_STREAK ? 0.2 : 1);
+
+/* ---------- picking questions for a run ---------- */
+function filtered(cfg) {
+  return QS.filter(q => (!cfg.cats.length || cfg.cats.includes(q.category)) && (!cfg.kinds.length || cfg.kinds.includes(q.kind)));
+}
+function poolFor(mode, list) {
+  if (mode === 'errors') return list.filter(q => (st(q.id)?.w || 0) > 0);
+  if (mode === 'review') return list.filter(q => (st(q.id)?.r || 0) > 0);
+  return list;
+}
+function pick(mode, list, n) {
+  const pool = poolFor(mode, list);
+  let ranked;
+  if (mode === 'errors') {
+    // weighted sampling without replacement: the harder a question is for you, the likelier it comes up
+    ranked = pool.map(q => [q.id, Math.pow(Math.random(), 1 / difficulty(st(q.id)))]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+  } else if (mode === 'review') {
+    ranked = shuffle(pool.slice()).sort((a, b) => (st(a.id).t || 0) - (st(b.id).t || 0)).map(q => q.id);
+  } else {
+    ranked = shuffle(pool.slice()).sort((a, b) => (st(a.id)?.s || 0) - (st(b.id)?.s || 0)).map(q => q.id);
+  }
+  return shuffle(ranked.slice(0, n));
+}
+function countBounds(avail) {
+  const max = Math.min(COUNT_MAX, avail);
+  return { min: Math.min(COUNT_MIN, max), max };
+}
+
+/* ---------- run lifecycle ---------- */
+function startRun() {
+  const cfg = prefs.cfg;
+  const list = filtered(cfg);
+  const avail = poolFor(cfg.mode, list).length;
+  if (!avail) return;
+  const { min, max } = countBounds(avail);
+  const ids = pick(cfg.mode, list, clamp(cfg.count, min, max));
+  S.run = {
+    active: true, id: Date.now().toString(36), startedAt: Date.now(), mode: cfg.mode, hard: cfg.hard,
+    cats: cfg.cats.slice(), kinds: cfg.kinds.slice(), main: ids.length, order: ids, pos: 0, log: [],
+    firstOk: 0, firstBad: 0, finished: false, updatedAt: 0,
+  };
+  S.sel = []; S.confirm = null; S.screen = 'quiz'; S.lastRunSig = runSig();
+  store.save('run');
+  render(); window.scrollTo(0, 0);
+}
+function currentQ() {
+  const r = S.run;
+  while (r.pos < r.order.length && !QMAP[r.order[r.pos]]) r.pos++;   // skip questions removed from the bank
+  return r.pos < r.order.length ? QMAP[r.order[r.pos]] : null;
+}
+function submit() {
+  const r = S.run, q = currentQ();
+  if (!q || r.log[r.pos] || !S.sel.length) return;
+  const picked = S.sel.slice().sort((a, b) => a - b);
+  const ok = sameSet(picked, q.correct);
+  r.log[r.pos] = { p: picked, ok };
+  if (r.pos < r.main) ok ? r.firstOk++ : r.firstBad++;
+  if (!ok && !r.order.slice(r.pos + 1).includes(q.id)) r.order.push(q.id);   // ask again until answered correctly
+  record(q.id, ok);
+  playSound(ok);
+  S.lastRunSig = runSig();
+  store.save('run'); store.save('progress');
+  render();
+  if (!ok) $('.opts')?.classList.add('shake');
+  $('.verdict')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function next() {
+  const r = S.run;
+  if (!r.log[r.pos]) return;
+  r.pos++;
+  S.sel = [];
+  if (!currentQ()) finishRun();
+  S.lastRunSig = runSig();
+  store.save('run');
+  render(); window.scrollTo(0, 0);
+}
+function finishRun() {
+  const r = S.run;
+  r.finished = true;
+  r.mainDone = r.log.slice(0, r.main).filter(Boolean).length;
+  const h = S.progress.history;
+  h.push({ t: Date.now(), mode: r.mode, n: r.mainDone, ok: r.firstOk, extra: r.order.length - r.main, hard: !!r.hard });
+  if (h.length > HISTORY_LIMIT) h.splice(0, h.length - HISTORY_LIMIT);
+  store.save('progress');
+}
+function discardRun() {
+  S.run = emptyRun(); S.sel = []; S.confirm = null; S.lastRunSig = runSig();
+  store.save('run');
+}
+
+/* ---------- sound ---------- */
+let actx = null;
+function playSound(ok) {
+  if (!prefs.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t0 = actx.currentTime;
+    const notes = ok ? [[659.25, 0, .22], [987.77, .09, .3]] : [[196, 0, .22], [146.83, .13, .32]];
+    for (const [f, d, len] of notes) {
+      const o = actx.createOscillator(), g = actx.createGain(), lp = actx.createBiquadFilter();
+      o.type = ok ? 'sine' : 'sawtooth';
+      o.frequency.setValueAtTime(f, t0 + d);
+      lp.type = 'lowpass'; lp.frequency.value = ok ? 4000 : 700;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(ok ? 0.22 : 0.18, t0 + d + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + len);
+      o.connect(lp).connect(g).connect(actx.destination);
+      o.start(t0 + d); o.stop(t0 + d + len + 0.05);
+    }
+  } catch { /* audio unavailable */ }
+}
+
+/* ---------- chrome (header) ---------- */
+function renderChrome() {
+  const app = $('#app');
+  app.classList.toggle('show-ru', !!prefs.ru);
+  $('#ru-switch').setAttribute('aria-checked', String(!!prefs.ru));
+  const sb = $('#sound-btn');
+  sb.setAttribute('aria-checked', String(!!prefs.sound));
+  sb.innerHTML = prefs.sound ? ICON.soundOn : ICON.soundOff;
+  sb.title = prefs.sound ? 'Zvuky zapnuty' : 'Zvuky vypnuty';
+  $('#brand-sub').textContent = `${QS.length} ${plural(QS.length, 'otázka', 'otázky', 'otázek')} · ${CATS.length} ${plural(CATS.length, 'kategorie', 'kategorie', 'kategorií')}`;
+  const onQuiz = S.screen !== 'stats';
+  $('#tab-setup').setAttribute('aria-current', onQuiz ? 'page' : 'false');
+  $('#tab-stats').setAttribute('aria-current', onQuiz ? 'false' : 'page');
+  const pill = $('#store-pill');
+  const labels = {
+    connecting: ['Připojuji…', 'Načítám sdílený postup'],
+    shared: ['Sdílený postup', 'Postup vidí a ukládá každý, kdo otevře tento odkaz'],
+    readonly: ['Sdílený postup · jen čtení', 'Vaše odpovědi se uloží jen v tomto zařízení'],
+    local: ['Jen toto zařízení', 'Postup se ukládá pouze v tomto prohlížeči'],
+  };
+  const [label, title] = labels[store.mode];
+  pill.textContent = label; pill.title = title; pill.dataset.mode = store.mode;
+}
+
+/* ---------- views ---------- */
+function render() {
+  renderChrome();
+  const v = $('#view');
+  if (S.screen === 'stats') v.innerHTML = viewStats();
+  else if (S.screen === 'quiz' && S.run.active) v.innerHTML = S.run.finished ? viewResults() : viewQuiz();
+  else { S.screen = 'setup'; v.innerHTML = viewSetup(); }
+}
+
+function viewSetup() {
+  const cfg = prefs.cfg;
+  const list = filtered(cfg);
+  const avail = poolFor(cfg.mode, list).length;
+  const { min, max } = countBounds(avail);
+  const count = clamp(cfg.count, min, max);
+  const r = S.run;
+  const resume = r.active && !r.finished ? `
+    <div class="card resume stack">
+      <div>
+        <p class="section-label">${L('Rozpracovaný test', 'Незавершённый тест')}</p>
+        <h3>${esc(MODES[r.mode]?.cs || '')} · <span class="num">${Math.min(r.pos + 1, r.order.length)} / ${r.order.length}</span></h3>
+        <p class="small muted">${r.hard ? 'Těžký režim' : 'Lehký režim'} · zahájeno ${fmtDate(r.startedAt)}</p>
+      </div>
+      <div class="row">
+        <button type="button" class="btn primary" data-action="resume">${L('Pokračovat', 'Продолжить')}</button>
+        <button type="button" class="btn ghost sm" data-action="ask" data-what="discard">Zahodit</button>
+      </div>
+      ${S.confirm === 'discard' ? `<div class="confirm"><span>${L('Opravdu zahodit rozpracovaný test? Odpovědi zůstanou ve statistice.', 'Точно удалить незавершённый тест? Ответы останутся в статистике.')}</span>
+        <div class="row"><button type="button" class="btn danger sm" data-action="discard">Ano, zahodit</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Ne</button></div></div>` : ''}
+    </div>` : '';
+
+  const catChips = [`<button type="button" class="chip" data-action="cat" data-cat="" aria-pressed="${!cfg.cats.length}">${L('Všechny kategorie', 'Все категории')} <span class="count">${QS.length}</span></button>`]
+    .concat(CATS.map(c => {
+      const n = QS.filter(q => q.category === c).length;
+      const done = QS.filter(q => q.category === c && statusOf(q.id) === 'done').length;
+      return `<button type="button" class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${cfg.cats.includes(c)}">${esc(c)} <span class="count">${done}/${n}</span></button>`;
+    })).join('');
+  const kindChips = KINDS.map(k => `<button type="button" class="chip" data-action="kind" data-kind="${k.id}" aria-pressed="${!cfg.kinds.length || cfg.kinds.includes(k.id)}">${L(k.cs, k.ru)} <span class="count">${QS.filter(q => q.kind === k.id).length}</span></button>`).join('');
+
+  const modeCards = Object.entries(MODES).map(([id, m]) => {
+    const a = poolFor(id, list).length;
+    return `<button type="button" class="mode" role="radio" data-action="mode" data-mode="${id}" aria-checked="${cfg.mode === id}">
+      <span class="dot"></span><b>${L(m.cs, m.ru)}</b><span class="avail">${a} ${plural(a, 'otázka', 'otázky', 'otázek')}</span>
+      <span class="desc">${L(m.dcs, m.dru)}</span></button>`;
+  }).join('');
+
+  const emptyMsg = cfg.mode === 'errors' ? L('Zatím nemáte žádné chyby. Projeďte nejdřív sněhovou kouli.', 'Ошибок пока нет. Сначала пройдите «Снежный ком».')
+    : cfg.mode === 'review' ? L('Zatím nemáte žádné zvládnuté otázky k opakování.', 'Пока нет освоенных вопросов для повторения.')
+    : L('Výběru neodpovídá žádná otázka. Upravte kategorie nebo typy.', 'Под выбор не подходит ни один вопрос. Измените категории или типы.');
+  const startLabel = r.active && !r.finished ? L('Začít nový test', 'Начать новый тест') : L('Začít test', 'Начать тест');
+
+  return `
+  <div class="grid-2">
+    <div class="stack">
+      ${resume}
+      <section class="card stack">
+        <div><p class="section-label">${L('Kategorie', 'Категории')}</p><div class="chips">${catChips}</div></div>
+        <div><p class="section-label">${L('Typ otázek', 'Тип вопросов')}</p><div class="chips">${kindChips}</div></div>
+      </section>
+    </div>
+    <div class="stack">
+      <section class="card stack">
+        <div><p class="section-label">${L('Režim', 'Режим')}</p><div class="modes" role="radiogroup">${modeCards}</div></div>
+        <div>
+          <p class="section-label">${L('Obtížnost', 'Сложность')}</p>
+          <div class="seg" role="radiogroup">
+            <button type="button" role="radio" data-action="hard" data-val="0" aria-checked="${!cfg.hard}">Lehká</button>
+            <button type="button" role="radio" data-action="hard" data-val="1" aria-checked="${cfg.hard}">Těžká</button>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">${cfg.hard
+            ? L('U otázky neuvidíte, kolik odpovědí je správně. Vždy můžete označit více možností.', 'Не видно, сколько ответов правильные. Всегда можно отметить несколько вариантов.')
+            : L('U každé otázky uvidíte, zda má jednu, nebo více správných odpovědí a kolik.', 'У каждого вопроса видно, один в нём правильный ответ или несколько и сколько именно.')}</p>
+        </div>
+        <div>
+          <p class="section-label">${L('Počet otázek', 'Количество вопросов')}</p>
+          ${avail ? `<div class="count-row">
+            <input type="range" id="count" min="${min}" max="${max}" step="1" value="${count}" ${min === max ? 'disabled' : ''} aria-label="Počet otázek">
+            <span class="count-val" id="count-val">${count}</span>
+          </div>
+          <p class="small muted" style="margin:6px 0 0">K dispozici ${avail} ${plural(avail, 'otázka', 'otázky', 'otázek')}${avail < COUNT_MIN ? ' – v testu budou všechny' : ''}.</p>` : `<div class="empty">${emptyMsg}</div>`}
+        </div>
+        ${S.confirm === 'replace' ? `<div class="confirm"><span>${L('Nový test nahradí rozpracovaný. Pokračovat?', 'Новый тест заменит незавершённый. Продолжить?')}</span>
+          <div class="row"><button type="button" class="btn danger sm" data-action="start-force">Ano, začít nový</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Ne</button></div></div>` : ''}
+        <button type="button" class="btn primary block" data-action="start" ${avail ? '' : 'disabled'}>${startLabel}</button>
+      </section>
+    </div>
+  </div>`;
+}
+
+function viewQuiz() {
+  const r = S.run, q = currentQ();
+  if (!q) return viewResults();
+  const entry = r.log[r.pos];
+  const answered = !!entry;
+  const inFix = r.pos >= r.main;
+  const left = r.order.length - r.pos - (answered ? 1 : 0);
+  const showKind = !r.hard;
+  const nCorrect = q.correct.length;
+  const multiUI = r.hard || q.correct.length > 1;
+  const kindBadge = !showKind ? '' : q.correct.length > 1
+    ? `<span class="badge kind">Více odpovědí · ${nCorrect} ${plural(nCorrect, 'správná', 'správné', 'správných')}</span>`
+    : `<span class="badge kind">Jedna správná odpověď</span>`;
+  const sel = answered ? entry.p : S.sel;
+
+  const opts = q.options.map((o, i) => {
+    const picked = sel.includes(i), isCorrect = q.correct.includes(i);
+    let cls = '', mark = String(i + 1), note = '';
+    if (answered) {
+      if (picked && isCorrect) { cls = 'is-ok'; mark = ICON.check; note = 'Vaše odpověď · správně'; }
+      else if (picked) { cls = 'is-bad'; mark = ICON.cross; note = 'Vaše odpověď · špatně'; }
+      else if (isCorrect) { cls = 'is-missed'; mark = ICON.check; note = 'Správná odpověď'; }
+      else cls = 'is-dim';
+    }
+    return `<button type="button" class="opt ${cls}" data-action="opt" data-i="${i}" aria-pressed="${!answered && picked}" ${answered ? 'disabled' : ''}>
+      <span class="mk ${multiUI ? 'square' : 'round'}">${mark}</span>
+      <span>${tx(o)}${note ? `<span class="opt-note">${note}</span>` : ''}</span></button>`;
+  }).join('');
+
+  const verdict = !answered ? '' : entry.ok
+    ? `<div class="verdict ok"><span class="vi">${ICON.check}</span><div><strong>Správně!</strong>${L('Výborně, pokračujte.', 'Отлично, продолжайте.')}</div></div>`
+    : `<div class="verdict bad"><span class="vi">${ICON.cross}</span><div><strong>Špatně</strong>${L('Vaše odpověď je červeně, správná zeleně. Otázka se vám v tomto testu objeví znovu.', 'Ваш ответ выделен красным, правильный — зелёным. Этот вопрос в тесте появится снова.')}</div></div>`;
+  const explanation = answered && q.explanation ? `<div class="explain">${tx(q.explanation)}</div>` : '';
+  const mainDone = Math.min(r.pos + (answered ? 1 : 0), r.main);
+
+  return `
+  <div class="quiz">
+    <div class="qhead">
+      <span class="pos">${inFix ? 'Oprava' : `${r.pos + 1} / ${r.main}`}</span>
+      <span>${esc(MODES[r.mode]?.cs || '')} · ${r.hard ? 'těžká' : 'lehká'}</span>
+      <span style="margin-left:auto" class="row">
+        <span class="score ok" title="Správně napoprvé">${ICON.check}${r.firstOk}</span>
+        <span class="score bad" title="Chyby">${ICON.cross}${r.firstBad}</span>
+      </span>
+    </div>
+    <div class="pbar" aria-hidden="true"><i style="width:${pct(mainDone, r.main)}%"></i></div>
+    ${inFix ? `<div class="phase">${L(`Oprava chyb: ${answered ? 'zbývá ještě' : 'zbývá'} ${left}. Test skončí, až všechny chyby opravíte.`, `Работа над ошибками: осталось ${left}. Тест закончится, когда все ошибки будут исправлены.`)}</div>` : ''}
+    <div class="badges"><span class="badge">${esc(q.category)}</span>${q.kind === 'situation' ? '<span class="badge">Situace</span>' : ''}${kindBadge}</div>
+    ${q.scenario ? `<div class="scenario"><span class="lbl">Situace</span>${tx(q.scenario)}</div>` : ''}
+    <h2 class="qtext">${tx(q.question)}</h2>
+    <div class="opts">${opts}</div>
+    ${verdict}
+    ${explanation}
+    <div class="row" style="justify-content:space-between">
+      <span class="kbd-hint">Klávesy 1–${q.options.length} vyberou odpověď, Enter potvrdí.</span>
+      <span class="row" style="gap:16px"><button type="button" class="link-btn small" data-action="goto-setup">Výběr testu</button>
+      <button type="button" class="link-btn small" data-action="ask" data-what="end">Ukončit test</button></span>
+    </div>
+    ${S.confirm === 'end' ? `<div class="confirm"><span>${L('Ukončit test? Dosavadní odpovědi zůstanou ve statistice.', 'Завершить тест? Ответы останутся в статистике.')}</span>
+      <div class="row"><button type="button" class="btn danger sm" data-action="end">Ano, ukončit</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Ne</button></div></div>` : ''}
+  </div>
+  <div class="actionbar"><div class="actionbar-in">
+    ${answered
+      ? `<button type="button" class="btn primary" data-action="next">${r.pos + 1 >= r.order.length ? 'Dokončit test' : 'Další otázka'}</button>`
+      : `<button type="button" class="btn primary" data-action="submit" ${S.sel.length ? '' : 'disabled'}>Odpovědět</button>`}
+  </div></div>`;
+}
+
+function viewResults() {
+  const r = S.run;
+  const n = r.mainDone ?? r.main;
+  const score = pct(r.firstOk, n);
+  const wrongIds = [...new Set(r.order.slice(0, r.main).filter((id, i) => r.log[i] && !r.log[i].ok))];
+  const list = wrongIds.map(id => QMAP[id]).filter(Boolean);
+  return `
+  <div class="quiz">
+    <section class="card stack">
+      <p class="section-label">${L('Test dokončen', 'Тест завершён')}</p>
+      <div class="result-hero">
+        <span class="big">${score}<span style="font-size:.5em"> %</span></span>
+        <div>
+          <strong>${r.firstOk} z ${n}</strong> ${L('správně napoprvé', 'правильно с первого раза')}
+          <p class="small muted" style="margin:4px 0 0">${esc(MODES[r.mode]?.cs || '')} · ${r.hard ? 'těžká' : 'lehká'} · opravných otázek ${r.order.length - r.main}</p>
+        </div>
+      </div>
+      ${list.length ? `<div><p class="section-label">${n < r.main ? L('Chyby v tomto testu', 'Ошибки в этом тесте') : L('Chyby v tomto testu (všechny opraveny)', 'Ошибки в этом тесте (все исправлены)')}</p>
+        <ul class="qlist">${list.map(q => `<li>${tx(q.question)}<span class="badge">${esc(q.category)}</span></li>`).join('')}</ul></div>`
+        : `<p>${L('Bez jediné chyby. Skvělá práce!', 'Ни одной ошибки. Отличная работа!')}</p>`}
+    </section>
+  </div>
+  <div class="actionbar"><div class="actionbar-in">
+    <button type="button" class="btn" data-action="nav" data-screen="stats">Statistika</button>
+    <button type="button" class="btn primary" data-action="new">Nový test</button>
+  </div></div>`;
+}
+
+function statusCounts(qs) {
+  const c = { done: 0, learn: 0, err: 0, new: 0 };
+  qs.forEach(q => c[statusOf(q.id)]++);
+  return c;
+}
+function statBar(c, total, cls = '') {
+  const seg = (k) => c[k] ? `<i class="s-${k}" style="width:${c[k] / total * 100}%"></i>` : '';
+  return `<div class="statbar ${cls}" role="img" aria-label="Zvládnuto ${c.done}, rozpracováno ${c.learn}, chyby ${c.err}, nezodpovězeno ${c.new}">${seg('done')}${seg('learn')}${seg('err')}${seg('new')}</div>`;
+}
+
+function viewStats() {
+  const total = QS.length;
+  const c = statusCounts(QS);
+  const all = Object.values(S.progress.q);
+  const answers = all.reduce((a, s) => a + s.s, 0);
+  const right = all.reduce((a, s) => a + s.r, 0);
+  const hist = S.progress.history;
+  const recent = hist.slice(-24);
+
+  const legend = `<div class="legend">
+    <span><i class="sw s-done"></i>Zvládnuto <b class="num">${c.done}</b></span>
+    <span><i class="sw s-learn"></i>Rozpracováno <b class="num">${c.learn}</b></span>
+    <span><i class="sw s-err"></i>Chyby k opravě <b class="num">${c.err}</b></span>
+    <span><i class="sw s-new"></i>Nezodpovězeno <b class="num">${c.new}</b></span></div>`;
+
+  const cats = CATS.map(cat => {
+    const qs = QS.filter(q => q.category === cat);
+    const cc = statusCounts(qs);
+    return `<div class="cat-row"><span>${esc(cat)}</span><span class="num">${cc.done}/${qs.length}</span>${statBar(cc, qs.length, 'sm')}</div>`;
+  }).join('');
+
+  const chart = recent.length ? `
+    <div class="chart">
+      <div class="yax"><span>100 %</span><span>50 %</span><span>0 %</span></div>
+      <div class="plot">
+        <div class="grid-line" style="top:0"></div><div class="grid-line" style="top:50%"></div>
+        ${recent.map((h, i) => { const p = pct(h.ok, h.n); return `<div class="bar" data-tip="${i}" tabindex="0" aria-label="${fmtDate(h.t)}: ${p} %"><i style="height:${Math.max(p, 1)}%"></i></div>`; }).join('')}
+      </div>
+      <div class="xax"><span>${fmtDate(recent[0].t)}</span><span>${recent.length > 1 ? fmtDate(recent[recent.length - 1].t) : ''}</span></div>
+    </div>` : `<div class="empty">${L('Graf se zobrazí po prvním dokončeném testu.', 'График появится после первого завершённого теста.')}</div>`;
+
+  const hardest = QS.filter(q => (st(q.id)?.w || 0) > 0).sort((a, b) => difficulty(st(b.id)) - difficulty(st(a.id))).slice(0, 6);
+
+  return `
+  <div class="grid-2">
+    <div class="stack">
+      <section class="card stack">
+        <p class="section-label">${L('Celkový postup', 'Общий прогресс')}</p>
+        <div class="hero-num"><span class="big">${pct(c.done, total)}<span style="font-size:.5em"> %</span></span><span>${L(`zvládnuto ${c.done} z ${total} otázek`, `освоено ${c.done} из ${total} вопросов`)}</span></div>
+        ${statBar(c, total)}
+        ${legend}
+        <p class="small muted" style="margin:0">Otázka je zvládnutá, když na ni odpovíte správně ${MASTERED_STREAK}× za sebou.</p>
+        <div class="kpis">
+          <div class="kpi"><div class="v">${answers}</div><div class="l">odpovědí celkem</div></div>
+          <div class="kpi"><div class="v">${pct(right, answers)} %</div><div class="l">úspěšnost odpovědí</div></div>
+          <div class="kpi"><div class="v">${hist.length}</div><div class="l">dokončených testů</div></div>
+        </div>
+      </section>
+      <section class="card stack">
+        <p class="section-label">${L('Úspěšnost napoprvé v posledních testech', 'Успешность с первой попытки в последних тестах')}</p>
+        ${chart}
+      </section>
+    </div>
+    <div class="stack">
+      <section class="card stack">
+        <p class="section-label">${L('Podle kategorií', 'По категориям')}</p>
+        <div class="cat-rows">${cats}</div>
+      </section>
+      <section class="card stack hard-list">
+        <p class="section-label">${L('Nejtěžší otázky', 'Самые трудные вопросы')}</p>
+        ${hardest.length ? `<ul class="qlist">${hardest.map(q => { const s = st(q.id); return `<li>${tx(q.question)}<span class="num" title="chyby / správně">${s.w}× / ${s.r}×</span></li>`; }).join('')}</ul>`
+          : `<div class="empty">${L('Zatím žádné chyby.', 'Пока ошибок нет.')}</div>`}
+      </section>
+      <section class="card stack danger-zone">
+        <p class="section-label">${L('Smazání postupu', 'Сброс прогресса')}</p>
+        <p class="small muted" style="margin:0">${store.mode === 'shared' ? 'Smaže statistiku i rozpracovaný test pro všechny, kdo tento odkaz používají.' : 'Smaže statistiku i rozpracovaný test v tomto zařízení.'}</p>
+        ${S.confirm === 'reset' ? `<div class="confirm">
+            <label for="reset-input">${L('Pro potvrzení napište SMAZAT', 'Для подтверждения напишите SMAZAT')}</label>
+            <input id="reset-input" autocomplete="off" autocapitalize="characters" value="${esc(S.resetText)}">
+            <div class="row"><button type="button" class="btn danger sm" data-action="reset" id="reset-go" ${S.resetText.trim().toUpperCase() === 'SMAZAT' ? '' : 'disabled'}>Smazat veškerý postup</button>
+            <button type="button" class="btn ghost sm" data-action="ask" data-what="">Zrušit</button></div></div>`
+          : `<div><button type="button" class="btn sm" data-action="ask" data-what="reset">Smazat postup…</button></div>`}
+      </section>
+    </div>
+  </div>`;
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = $('#tooltip');
+  el.textContent = msg; el.hidden = false;
+  el.style.left = '50%'; el.style.top = 'auto'; el.style.bottom = 'calc(90px + env(safe-area-inset-bottom, 0px))'; el.style.transform = 'translateX(-50%)';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; el.style.bottom = ''; el.style.transform = ''; }, 3200);
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-action]');
+  if (!b || b.disabled) return;
+  const a = b.dataset.action, cfg = prefs.cfg;
+  switch (a) {
+    case 'nav':
+      S.screen = b.dataset.screen === 'stats' ? 'stats' : (S.run.active ? 'quiz' : 'setup');
+      if (b.dataset.screen === 'setup' && S.run.active && S.run.finished) S.screen = 'quiz';
+      S.confirm = null; render(); window.scrollTo(0, 0); return;
+    case 'cat': {
+      const c = b.dataset.cat;
+      if (!c) cfg.cats = [];
+      else cfg.cats = cfg.cats.includes(c) ? cfg.cats.filter(x => x !== c) : [...cfg.cats, c];
+      if (cfg.cats.length === CATS.length) cfg.cats = [];
+      break;
+    }
+    case 'kind': {
+      const k = b.dataset.kind;
+      let ks = cfg.kinds.length ? cfg.kinds.slice() : KINDS.map(x => x.id);
+      ks = ks.includes(k) ? ks.filter(x => x !== k) : [...ks, k];
+      cfg.kinds = ks.length === KINDS.length || !ks.length ? [] : ks;
+      break;
+    }
+    case 'mode': cfg.mode = b.dataset.mode; break;
+    case 'hard': cfg.hard = b.dataset.val === '1'; break;
+    case 'start':
+      if (S.run.active && !S.run.finished) { S.confirm = 'replace'; break; }
+      startRun(); return;
+    case 'start-force': startRun(); return;
+    case 'goto-setup': S.screen = 'setup'; S.confirm = null; render(); window.scrollTo(0, 0); return;
+    case 'resume': S.screen = 'quiz'; S.confirm = null; render(); window.scrollTo(0, 0); return;
+    case 'ask': S.confirm = b.dataset.what || null; S.resetText = ''; render();
+      if (S.confirm === 'reset') $('#reset-input')?.focus();
+      return;
+    case 'discard': discardRun(); render(); return;
+    case 'end':
+      S.confirm = null;
+      if (S.run.log.some(Boolean)) { finishRun(); store.save('run'); } else discardRun();
+      render(); window.scrollTo(0, 0); return;
+    case 'opt': toggleOpt(+b.dataset.i); return;
+    case 'submit': submit(); return;
+    case 'next': next(); return;
+    case 'new': discardRun(); S.screen = 'setup'; render(); window.scrollTo(0, 0); return;
+    case 'reset':
+      S.progress = emptyProgress(); S.run = emptyRun(); S.confirm = null; S.sel = []; S.lastRunSig = runSig();
+      store.save('progress'); store.save('run');
+      render(); toast('Postup byl smazán.'); return;
+    default: return;
+  }
+  savePrefs(); render();
+});
+
+function toggleOpt(i) {
+  const r = S.run, q = currentQ();
+  if (!q || r.log[r.pos]) return;
+  const multiUI = r.hard || q.correct.length > 1;
+  if (multiUI) S.sel = S.sel.includes(i) ? S.sel.filter(x => x !== i) : [...S.sel, i];
+  else S.sel = [i];
+  document.querySelectorAll('.opt').forEach(el => el.setAttribute('aria-pressed', String(S.sel.includes(+el.dataset.i))));
+  const sb = $('[data-action="submit"]');
+  if (sb) sb.disabled = !S.sel.length;
+}
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'count') {
+    prefs.cfg.count = +e.target.value; $('#count-val').textContent = e.target.value; savePrefs();
+  } else if (e.target.id === 'reset-input') {
+    S.resetText = e.target.value;
+    $('#reset-go').disabled = S.resetText.trim().toUpperCase() !== 'SMAZAT';
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (S.screen !== 'quiz' || !S.run.active || S.run.finished || e.target.matches('input, textarea')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const q = currentQ(); if (!q) return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= q.options.length) { toggleOpt(n - 1); e.preventDefault(); }
+  else if (e.key === 'Enter' && !e.target.closest('button')) { S.run.log[S.run.pos] ? next() : submit(); e.preventDefault(); }
+});
+
+$('#ru-switch').addEventListener('click', () => { prefs.ru = !prefs.ru; savePrefs(); renderChrome(); });
+$('#sound-btn').addEventListener('click', () => { prefs.sound = !prefs.sound; savePrefs(); renderChrome(); if (prefs.sound) playSound(true); });
+
+/* chart tooltip */
+function showTip(bar) {
+  const h = S.progress.history.slice(-24)[+bar.dataset.tip];
+  if (!h) return;
+  const tip = $('#tooltip');
+  tip.innerHTML = `<b>${new Date(h.t).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</b><br>
+    ${esc(MODES[h.mode]?.cs || '')} · ${h.hard ? 'těžká' : 'lehká'}<br>
+    Napoprvé správně <span class="num">${h.ok}/${h.n}</span> (<span class="num">${pct(h.ok, h.n)} %</span>)`;
+  tip.style.bottom = ''; tip.style.transform = '';
+  tip.hidden = false;
+  const rc = bar.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = clamp(rc.left + rc.width / 2 - tw / 2, 8, window.innerWidth - tw - 8) + 'px';
+  tip.style.top = Math.max(8, rc.top - th - 8) + 'px';
+  document.querySelectorAll('.bar.on').forEach(x => x.classList.remove('on'));
+  bar.classList.add('on');
+}
+function hideTip() { $('#tooltip').hidden = true; document.querySelectorAll('.bar.on').forEach(x => x.classList.remove('on')); }
+document.addEventListener('pointerover', e => { const b = e.target.closest('.bar[data-tip]'); if (b) showTip(b); });
+document.addEventListener('pointerout', e => { if (e.target.closest('.bar[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const b = e.target.closest('.bar[data-tip]'); if (b) showTip(b); });
+document.addEventListener('focusout', e => { if (e.target.closest('.bar[data-tip]')) hideTip(); });
+window.addEventListener('scroll', () => { if (!$('#tooltip').hidden && $('.bar.on')) hideTip(); }, { passive: true });
+
+/* ---------- boot ---------- */
+S.lastRunSig = runSig();
+store.init().then(() => { if (store.mode !== 'local') render(); });
+if (S.run.active && !S.run.finished) S.screen = 'quiz';
+render();
+})();

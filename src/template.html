@@ -1,0 +1,39 @@
+<title>Český trenažér</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/*@STYLES*/
+</style>
+<div id="app">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div class="brand-text">
+          <strong>Český trenažér</strong>
+          <span class="brand-sub" id="brand-sub"></span>
+        </div>
+      </div>
+      <div class="controls">
+        <button type="button" id="ru-switch" class="lang-switch" role="switch" aria-checked="false" aria-label="Zobrazit ruský překlad" title="Překlad do ruštiny">
+          <span class="ls-track"><span class="ls-cz">CZ</span><span class="ls-ru">RU</span><span class="ls-knob"></span></span>
+        </button>
+        <button type="button" id="sound-btn" class="icon-btn" role="switch" aria-checked="true" aria-label="Zvukové efekty" title="Zvukové efekty"></button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Sekce">
+      <div class="tabs-in">
+        <button type="button" class="tab" data-action="nav" data-screen="setup" id="tab-setup">Test</button>
+        <button type="button" class="tab" data-action="nav" data-screen="stats" id="tab-stats">Statistika</button>
+        <span class="store-pill" id="store-pill"></span>
+      </div>
+    </nav>
+  </header>
+  <main id="view" aria-live="polite"></main>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+</div>
+<script>
+/*@APP*/
+</script>

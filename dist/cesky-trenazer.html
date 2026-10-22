@@ -1,0 +1,1053 @@
+<title>Český trenažér</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one 760px reading column; setup and stats split into two columns on desktop.
+   Header carries a modrotisk (Czech blueprint-print) dot band; answers sit in a thumb-reach action bar on phones. */
+:root {
+  --bg: #f2f4f8;
+  --surface: #ffffff;
+  --surface-2: #e9edf5;
+  --ink: #141a2e;
+  --ink-2: #48516f;
+  --muted: #737c9a;
+  --line: #d9dfea;
+  --accent: #2443c4;
+  --accent-soft: #e2e8fb;
+  --accent-ink: #ffffff;
+  --ok: #1d8049;
+  --ok-soft: #e1f3e8;
+  --bad: #c42f37;
+  --bad-soft: #fbe5e6;
+  --learn: #7f93e0;
+  --new: #cfd5e2;
+  --blueprint: #1c3399;
+  --blueprint-dot: rgba(255, 255, 255, .16);
+  --shadow: 0 1px 2px rgba(20, 26, 46, .06), 0 6px 24px rgba(20, 26, 46, .06);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 12px;
+  --r-sm: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1120; --surface: #161b2e; --surface-2: #1e2540; --ink: #e9ecf6; --ink-2: #b0b8d2; --muted: #7f88a6;
+    --line: #2a3254; --accent: #8199ff; --accent-soft: #232d57; --accent-ink: #0d1120;
+    --ok: #4cc583; --ok-soft: #133022; --bad: #ff6f76; --bad-soft: #3b171b; --learn: #5c6fc0; --new: #333b5c;
+    --blueprint: #121c4f; --blueprint-dot: rgba(160, 180, 255, .14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1120; --surface: #161b2e; --surface-2: #1e2540; --ink: #e9ecf6; --ink-2: #b0b8d2; --muted: #7f88a6;
+  --line: #2a3254; --accent: #8199ff; --accent-soft: #232d57; --accent-ink: #0d1120;
+  --ok: #4cc583; --ok-soft: #133022; --bad: #ff6f76; --bad-soft: #3b171b; --learn: #5c6fc0; --new: #333b5c;
+  --blueprint: #121c4f; --blueprint-dot: rgba(160, 180, 255, .14);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body { color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5; -webkit-tap-highlight-color: transparent; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--blueprint); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -.01em; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+/* translation layer — toggled on the fly via a class on #app */
+.t { display: block; }
+.t .ru { display: none; color: var(--muted); font-size: .88em; font-style: italic; line-height: 1.35; margin-top: 2px; }
+.show-ru .t .ru { display: block; }
+.t.inline, .t.inline .cs { display: inline; }
+.show-ru .t.inline .ru { display: inline; margin-left: .4em; }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--blueprint); color: #fff;
+  background-image: radial-gradient(var(--blueprint-dot) 1.4px, transparent 1.6px), radial-gradient(var(--blueprint-dot) 1.4px, transparent 1.6px);
+  background-size: 18px 18px; background-position: 0 0, 9px 9px; }
+.top-in, .tabs-in { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px 6px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-mark { width: 30px; height: 30px; border-radius: 50%; flex: none; background:
+  conic-gradient(from 45deg, #fff 0 25%, transparent 0 50%, #fff 0 75%, transparent 0) ; box-shadow: inset 0 0 0 2px #fff; opacity: .92; }
+.brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.brand-text strong { font-family: var(--f-display); font-weight: 800; font-size: 19px; letter-spacing: -.02em; }
+.brand-sub { font-size: 12px; opacity: .78; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.controls { display: flex; align-items: center; gap: 8px; flex: none; }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); color: #fff; display: grid; place-items: center; }
+.icon-btn:hover { background: rgba(255,255,255,.16); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+/* CZ/RU switch, styled like a day/night toggle */
+.lang-switch { border: 0; padding: 0; background: none; }
+.ls-track { position: relative; display: block; width: 72px; height: 36px; border-radius: 18px; background: linear-gradient(180deg, #ffd978, #ffb84d);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.25); transition: background .35s ease; overflow: hidden; }
+.ls-track::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #0f1638, #27357a); opacity: 0; transition: opacity .35s ease; }
+.ls-track::after { content: ""; position: absolute; width: 2px; height: 2px; border-radius: 50%; top: 9px; left: 14px; background: #fff;
+  box-shadow: 9px 12px 0 #fff, 17px 3px 0 0.5px #fff, 4px 17px 0 #fff; opacity: 0; transition: opacity .35s ease; }
+.ls-cz, .ls-ru { position: absolute; top: 50%; transform: translateY(-50%); font: 600 11px/1 var(--f-mono); letter-spacing: .06em; z-index: 1; transition: opacity .3s; }
+.ls-cz { right: 10px; color: #6b4300; }
+.ls-ru { left: 10px; color: #dfe6ff; opacity: 0; }
+.ls-knob { position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: #fff8e1; z-index: 2;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.35), 0 2px 4px rgba(0,0,0,.25); transition: transform .35s cubic-bezier(.5,1.6,.4,1), background .35s, box-shadow .35s; }
+.lang-switch[aria-checked="true"] .ls-track::before, .lang-switch[aria-checked="true"] .ls-track::after { opacity: 1; }
+.lang-switch[aria-checked="true"] .ls-knob { transform: translateX(36px); background: #e6e9f5; box-shadow: inset -7px -3px 0 0 #b9c0dc, 0 2px 4px rgba(0,0,0,.35); }
+.lang-switch[aria-checked="true"] .ls-cz { opacity: 0; }
+.lang-switch[aria-checked="true"] .ls-ru { opacity: 1; }
+
+.tabs { border-top: 1px solid rgba(255,255,255,.12); }
+.tabs-in { display: flex; align-items: center; gap: 4px; }
+.tab { border: 0; background: none; color: rgba(255,255,255,.72); padding: 10px 12px 11px; font-weight: 700; font-size: 15px; border-bottom: 3px solid transparent; }
+.tab[aria-current="page"] { color: #fff; border-bottom-color: #fff; }
+.store-pill { margin-left: auto; font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(255,255,255,.12); color: rgba(255,255,255,.9); white-space: nowrap; }
+.store-pill[data-mode="local"] { background: rgba(255, 196, 92, .22); }
+
+/* main */
+main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 120px; }
+.section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.grid-2 { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 860px) { .grid-2 { grid-template-columns: 1.1fr 1fr; } }
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 99px;
+  border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 16px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.btn.block { width: 100%; }
+.btn.sm { min-height: 38px; padding: 0 14px; font-size: 14px; }
+.link-btn { border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+/* chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 15px; text-align: left; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.chip .count { font: 500 12px/1 var(--f-mono); color: var(--muted); }
+.chip .t .ru { font-size: 12px; }
+
+/* mode cards */
+.modes { display: grid; gap: 8px; }
+.mode { display: grid; grid-template-columns: 22px 1fr auto; gap: 4px 12px; align-items: start; text-align: left; padding: 14px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface); }
+.mode[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.mode:disabled { opacity: .5; cursor: not-allowed; }
+.mode .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--muted); margin-top: 3px; }
+.mode[aria-checked="true"] .dot { border-color: var(--accent); background: radial-gradient(var(--accent) 45%, transparent 50%); }
+.mode b { font-family: var(--f-display); font-size: 17px; font-weight: 600; }
+.mode .desc { grid-column: 2 / 4; font-size: 14px; color: var(--ink-2); }
+.mode .avail { font: 500 12px/1.6 var(--f-mono); color: var(--muted); white-space: nowrap; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 99px; background: var(--surface-2); }
+.seg button { border: 0; min-height: 40px; border-radius: 99px; background: transparent; font-weight: 700; color: var(--ink-2); }
+.seg button[aria-checked="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+.count-row { display: flex; align-items: center; gap: 14px; }
+.count-row input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; min-width: 0; }
+.count-val { font: 600 26px/1 var(--f-mono); min-width: 2.5ch; text-align: right; }
+
+.resume { border-color: var(--accent); background: var(--accent-soft); box-shadow: none; }
+.confirm { border: 1px solid var(--bad); background: var(--bad-soft); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.confirm input { min-height: 44px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface); padding: 0 12px; width: 100%; }
+
+/* sticky action bar (thumb reach on phones) */
+.actionbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--line);
+  padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.actionbar-in { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; }
+.actionbar-in .btn { flex: 1; }
+
+/* quiz */
+.quiz { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.qhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); }
+.qhead .pos { font: 600 14px/1 var(--f-mono); color: var(--ink); }
+.score { display: inline-flex; align-items: center; gap: 4px; font: 600 13px/1 var(--f-mono); padding: 4px 8px; border-radius: 99px; }
+.score.ok { color: var(--ok); background: var(--ok-soft); }
+.score.bad { color: var(--bad); background: var(--bad-soft); }
+.score svg { width: 12px; height: 12px; }
+.pbar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; display: flex; gap: 2px; }
+.pbar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
+.pbar i.fix { background: var(--bad); }
+.phase { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--r-sm); background: var(--bad-soft); color: var(--ink); font-size: 14px; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); letter-spacing: .02em; }
+.badge.kind { background: var(--accent-soft); color: var(--accent); }
+.scenario { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 12px 14px; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: 16px; }
+.scenario .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: block; margin-bottom: 4px; }
+.qtext { font-family: var(--f-display); font-weight: 600; font-size: clamp(20px, 5.4vw, 26px); line-height: 1.25; }
+.qtext .ru { font-family: var(--f-body); font-weight: 400; font-size: 16px; }
+.opts { display: flex; flex-direction: column; gap: 8px; }
+.opt { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; width: 100%; text-align: left; padding: 13px 14px; min-height: 54px;
+  border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); font-size: 16px; line-height: 1.4; transition: border-color .15s, background .15s; }
+.opt:hover:not(:disabled) { border-color: var(--muted); }
+.opt .mk { width: 26px; height: 26px; display: grid; place-items: center; border: 2px solid var(--muted); font: 600 12px/1 var(--f-mono); color: var(--muted); }
+.opt .mk.round { border-radius: 50%; }
+.opt .mk.square { border-radius: 6px; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.opt[aria-pressed="true"] .mk { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.opt:disabled { cursor: default; }
+.opt.is-ok { border-color: var(--ok); background: var(--ok-soft); }
+.opt.is-ok .mk { background: var(--ok); border-color: var(--ok); color: #fff; }
+.opt.is-bad { border-color: var(--bad); background: var(--bad-soft); }
+.opt.is-bad .mk { background: var(--bad); border-color: var(--bad); color: #fff; }
+.opt.is-missed { border-color: var(--ok); border-style: dashed; border-width: 2px; padding: 12px 13px; }
+.opt.is-missed .mk { border-color: var(--ok); color: var(--ok); }
+.opt.is-dim { opacity: .55; }
+.opt .mk svg { width: 14px; height: 14px; }
+.opt-note { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.is-ok .opt-note, .is-missed .opt-note { color: var(--ok); }
+.is-bad .opt-note { color: var(--bad); }
+.verdict { scroll-margin-bottom: 120px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--r); font-size: 15px; animation: pop .25s ease-out; }
+.verdict.ok { background: var(--ok-soft); border: 1px solid var(--ok); }
+.verdict.bad { background: var(--bad-soft); border: 1px solid var(--bad); }
+.verdict .vi { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.verdict.ok .vi { background: var(--ok); }
+.verdict.bad .vi { background: var(--bad); }
+.verdict .vi svg { width: 18px; height: 18px; }
+.verdict strong { font-family: var(--f-display); font-size: 18px; display: block; }
+.explain { font-size: 15px; color: var(--ink-2); padding: 0 2px; }
+@keyframes pop { from { transform: scale(.97); opacity: .4; } to { transform: none; opacity: 1; } }
+.shake { animation: shake .35s; }
+@keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.kbd-hint { font-size: 12px; color: var(--muted); text-align: center; }
+@media (hover: none) { .kbd-hint { display: none; } }
+
+/* results */
+.result-hero { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.big { font: 600 56px/1 var(--f-mono); letter-spacing: -.03em; }
+.qlist { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.qlist li { padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+.qlist li:first-child { border-top: 0; }
+
+/* stats */
+.hero-num { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.hero-num .big { font-size: 48px; }
+.statbar { display: flex; gap: 2px; height: 16px; border-radius: 8px; overflow: hidden; background: var(--surface); }
+.statbar.sm { height: 8px; border-radius: 4px; }
+.statbar i { display: block; height: 100%; min-width: 0; }
+.statbar i:first-child { border-radius: 4px 0 0 4px; }
+.statbar i:last-child { border-radius: 0 4px 4px 0; }
+.s-done { background: var(--ok); }
+.s-learn { background: var(--learn); }
+.s-err { background: var(--bad); }
+.s-new { background: var(--new); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.legend .num { color: var(--ink); }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kpi { padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); min-width: 0; }
+.kpi .v { font: 600 22px/1.1 var(--f-mono); }
+.kpi .l { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.cat-rows { display: flex; flex-direction: column; gap: 12px; }
+.cat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 15px; }
+.cat-row .statbar { grid-column: 1 / -1; }
+.cat-row .num { font-size: 13px; color: var(--muted); }
+
+.chart { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 0 8px; }
+.chart .yax { display: flex; flex-direction: column; justify-content: space-between; font: 500 11px/1 var(--f-mono); color: var(--muted); height: 160px; text-align: right; }
+.chart .plot { position: relative; height: 160px; display: flex; align-items: flex-end; gap: 3px; border-bottom: 1px solid var(--muted); min-width: 0; }
+.chart .grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
+.chart .bar { flex: 1 1 0; max-width: 34px; min-width: 4px; position: relative; height: 100%; display: flex; align-items: flex-end; cursor: default; }
+.chart .bar i { display: block; width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
+.chart .bar:hover i, .chart .bar.on i { filter: brightness(1.15); outline: 2px solid var(--surface); }
+.chart .xax { grid-column: 2; display: flex; justify-content: space-between; font: 500 11px/1.8 var(--f-mono); color: var(--muted); }
+.empty { padding: 24px 12px; text-align: center; color: var(--muted); font-size: 14px; border: 1px dashed var(--line); border-radius: var(--r-sm); }
+.tooltip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; max-width: 240px; box-shadow: var(--shadow); }
+.tooltip .num { font-weight: 600; }
+
+.hard-list .qlist li .num { color: var(--bad); }
+.danger-zone { border-color: var(--line); }
+
+@media (max-width: 400px) {
+  main { padding-block: 14px 112px; }
+  .card { padding: 14px; }
+  .brand-text strong { font-size: 17px; }
+  .brand-mark { width: 26px; height: 26px; }
+  .ls-track { width: 64px; }
+  .lang-switch[aria-checked="true"] .ls-knob { transform: translateX(28px); }
+  .kpi .v { font-size: 19px; }
+  .big { font-size: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+</style>
+<div id="app">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div class="brand-text">
+          <strong>Český trenažér</strong>
+          <span class="brand-sub" id="brand-sub"></span>
+        </div>
+      </div>
+      <div class="controls">
+        <button type="button" id="ru-switch" class="lang-switch" role="switch" aria-checked="false" aria-label="Zobrazit ruský překlad" title="Překlad do ruštiny">
+          <span class="ls-track"><span class="ls-cz">CZ</span><span class="ls-ru">RU</span><span class="ls-knob"></span></span>
+        </button>
+        <button type="button" id="sound-btn" class="icon-btn" role="switch" aria-checked="true" aria-label="Zvukové efekty" title="Zvukové efekty"></button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Sekce">
+      <div class="tabs-in">
+        <button type="button" class="tab" data-action="nav" data-screen="setup" id="tab-setup">Test</button>
+        <button type="button" class="tab" data-action="nav" data-screen="stats" id="tab-stats">Statistika</button>
+        <span class="store-pill" id="store-pill"></span>
+      </div>
+    </nav>
+  </header>
+  <main id="view" aria-live="polite"></main>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+</div>
+<script>
+(() => {
+'use strict';
+
+/* ---------- question bank (inlined by build.mjs from questions/questions.json) ---------- */
+const QUESTIONS = [{"id":"q001","category":"Historie","type":"single","question":{"cs":"Ve kterém roce vznikla samostatná Československá republika?","ru":"В каком году была образована независимая Чехословацкая республика?"},"options":[{"cs":"1918","ru":"1918"},{"cs":"1945","ru":"1945"},{"cs":"1968","ru":"1968"},{"cs":"1993","ru":"1993"}],"correct":[0],"explanation":{"cs":"Československo vzniklo 28. října 1918.","ru":"Чехословакия была образована 28 октября 1918 года."}},{"id":"q002","category":"Zeměpis","type":"single","question":{"cs":"Jak se jmenuje nejvyšší hora České republiky?","ru":"Как называется самая высокая гора Чехии?"},"options":[{"cs":"Praděd","ru":"Прадед"},{"cs":"Sněžka","ru":"Снежка"},{"cs":"Lysá hora","ru":"Лыса-Гора"},{"cs":"Ještěd","ru":"Ештед"}],"correct":[1],"explanation":{"cs":"Sněžka v Krkonoších měří 1 603 m n. m.","ru":"Снежка в Крконоше — 1603 м над уровнем моря."}},{"id":"q003","category":"Zeměpis","type":"multi","question":{"cs":"Se kterými státy sousedí Česká republika?","ru":"С какими государствами граничит Чехия?"},"options":[{"cs":"Německo","ru":"Германия"},{"cs":"Rakousko","ru":"Австрия"},{"cs":"Maďarsko","ru":"Венгрия"},{"cs":"Polsko","ru":"Польша"},{"cs":"Slovensko","ru":"Словакия"}],"correct":[0,1,3,4]},{"id":"q004","category":"Stát a společnost","type":"single","question":{"cs":"Kdo jmenuje předsedu vlády České republiky?","ru":"Кто назначает председателя правительства Чехии?"},"options":[{"cs":"Prezident republiky","ru":"Президент республики"},{"cs":"Senát","ru":"Сенат"},{"cs":"Poslanecká sněmovna","ru":"Палата депутатов"},{"cs":"Ústavní soud","ru":"Конституционный суд"}],"correct":[0]},{"id":"q005","category":"Stát a společnost","type":"multi","question":{"cs":"Které z těchto dnů jsou v České republice státním svátkem?","ru":"Какие из этих дней являются государственными праздниками в Чехии?"},"options":[{"cs":"28. října","ru":"28 октября"},{"cs":"14. února","ru":"14 февраля"},{"cs":"17. listopadu","ru":"17 ноября"},{"cs":"5. července","ru":"5 июля"},{"cs":"1. dubna","ru":"1 апреля"}],"correct":[0,2,3],"explanation":{"cs":"28. 10. Den vzniku samostatného československého státu, 17. 11. Den boje za svobodu a demokracii, 5. 7. Den slovanských věrozvěstů Cyrila a Metoděje.","ru":"28.10 — День образования Чехословакии, 17.11 — День борьбы за свободу и демократию, 5.7 — День славянских просветителей Кирилла и Мефодия."}},{"id":"q006","category":"Kultura","type":"single","question":{"cs":"Kdo složil cyklus symfonických básní Má vlast?","ru":"Кто написал цикл симфонических поэм «Моя родина»?"},"options":[{"cs":"Antonín Dvořák","ru":"Антонин Дворжак"},{"cs":"Leoš Janáček","ru":"Леош Яначек"},{"cs":"Bedřich Smetana","ru":"Бедржих Сметана"},{"cs":"Bohuslav Martinů","ru":"Богуслав Мартину"}],"correct":[2]},{"id":"q007","category":"Kultura","type":"multi","question":{"cs":"Kteří z těchto autorů jsou čeští spisovatelé?","ru":"Кто из этих авторов — чешские писатели?"},"options":[{"cs":"Karel Čapek","ru":"Карел Чапек"},{"cs":"Franz Schubert","ru":"Франц Шуберт"},{"cs":"Jaroslav Hašek","ru":"Ярослав Гашек"},{"cs":"Božena Němcová","ru":"Божена Немцова"}],"correct":[0,2,3]},{"id":"q008","category":"Každodenní život","type":"situation","scenario":{"cs":"Na ulici vidíte člověka, který upadl, nereaguje na oslovení a nedýchá.","ru":"На улице вы видите человека, который упал, не реагирует на обращение и не дышит."},"question":{"cs":"Které číslo zavoláte jako první?","ru":"По какому номеру вы позвоните в первую очередь?"},"options":[{"cs":"155 – zdravotnická záchranná služba","ru":"155 — скорая медицинская помощь"},{"cs":"158 – policie","ru":"158 — полиция"},{"cs":"150 – hasiči","ru":"150 — пожарные"},{"cs":"156 – městská policie","ru":"156 — муниципальная полиция"}],"correct":[0],"explanation":{"cs":"Zdravotnickou záchrannou službu zavoláte na 155, případně na jednotné evropské číslo 112.","ru":"Скорую помощь вызывают по номеру 155 или по единому европейскому номеру 112."}},{"id":"q009","category":"Úřady","type":"situation","scenario":{"cs":"Ztratil(a) jste peněženku a v ní průkaz o povolení k pobytu.","ru":"Вы потеряли кошелёк, в котором была карта вида на жительство."},"question":{"cs":"Co je správné udělat?","ru":"Как правильно поступить?"},"options":[{"cs":"Ztrátu co nejdříve nahlásit policii","ru":"Как можно скорее сообщить о потере в полицию"},{"cs":"Požádat Ministerstvo vnitra o vydání nového průkazu","ru":"Подать в Министерство внутренних дел заявление о выдаче новой карты"},{"cs":"Počkat rok, jestli se průkaz nenajde","ru":"Подождать год, вдруг карта найдётся"},{"cs":"Nic nedělat, průkaz není potřeba","ru":"Ничего не делать, карта не нужна"}],"correct":[0,1]},{"id":"q010","category":"Úřady","type":"situation","scenario":{"cs":"Jako cizinec s povolením k pobytu jste se přestěhoval(a) do bytu v jiném městě.","ru":"Вы — иностранец с видом на жительство и переехали в квартиру в другом городе."},"question":{"cs":"Komu musíte změnu adresy nahlásit?","ru":"Кому нужно сообщить о смене адреса?"},"options":[{"cs":"Ministerstvu vnitra (Odboru azylové a migrační politiky)","ru":"Министерству внутренних дел (Отделу по вопросам убежища и миграции)"},{"cs":"Finančnímu úřadu","ru":"Налоговой инспекции"},{"cs":"Sousedům v domě","ru":"Соседям по дому"},{"cs":"Nikomu, změna adresy se nehlásí","ru":"Никому, о смене адреса не сообщают"}],"correct":[0],"explanation":{"cs":"Změnu místa pobytu je třeba nahlásit do 30 dnů.","ru":"О смене места проживания нужно сообщить в течение 30 дней."}}];
+
+const MASTERED_STREAK = 2;      // correct answers in a row that mark a question as learned
+const HISTORY_LIMIT = 300;      // finished runs kept in the shared document
+const COUNT_MIN = 10, COUNT_MAX = 100;
+
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const T = t => typeof t === 'string' ? { cs: t, ru: '' } : { cs: t?.cs || '', ru: t?.ru || '' };
+const tx = (t, cls = '') => { const { cs, ru } = T(t); return `<span class="t ${cls}"><span class="cs">${esc(cs)}</span>${ru ? `<span class="ru" lang="ru">${esc(ru)}</span>` : ''}</span>`; };
+const L = (cs, ru, cls) => tx({ cs, ru }, cls);
+const clone = o => JSON.parse(JSON.stringify(o));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sameSet = (a, b) => a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } };
+const fmtDate = t => new Date(t).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const plural = (n, one, few, many) => n === 1 ? one : (n >= 2 && n <= 4 ? few : many);
+
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  soundOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>',
+  soundOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
+};
+
+/* ---------- questions ---------- */
+const kindOf = q => q.type === 'situation' || q.scenario ? 'situation' : (q.correct.length > 1 || q.type === 'multi' ? 'multi' : 'single');
+const QS = QUESTIONS.map(q => ({ ...q, correct: [...q.correct].sort((a, b) => a - b) })).map(q => ({ ...q, kind: kindOf(q) }));
+const QMAP = Object.fromEntries(QS.map(q => [q.id, q]));
+const CATS = [...new Set(QS.map(q => q.category))];
+const KINDS = [
+  { id: 'single', cs: 'Jedna odpověď', ru: 'Один ответ' },
+  { id: 'multi', cs: 'Více odpovědí', ru: 'Несколько ответов' },
+  { id: 'situation', cs: 'Situace', ru: 'Ситуации' },
+];
+const MODES = {
+  snowball: { cs: 'Sněhová koule', ru: 'Снежный ком',
+    dcs: 'Projede všechny otázky bez ohledu na výsledky. Přednost mají ty, které jste viděli nejméně.',
+    dru: 'Прокатывается по всем вопросам без оглядки на результаты. В приоритете те, что встречались реже всего.' },
+  errors: { cs: 'Oprava chyb', ru: 'Работа над ошибками',
+    dcs: 'Jen otázky, ve kterých jste někdy chybovali. Nejčastěji přijdou ty, které vám jdou nejhůř.',
+    dru: 'Только вопросы, в которых вы ошибались. Чаще всего попадаются самые трудные для вас.' },
+  review: { cs: 'Opakování', ru: 'Заучивание',
+    dcs: 'Upevňuje otázky, které už vám jdou. Nejdřív ty, které jste nejdéle neviděli.',
+    dru: 'Закрепляет вопросы, которые уже получаются. Сначала те, что вы давно не видели.' },
+};
+
+/* ---------- state ---------- */
+const emptyProgress = () => ({ v: 1, q: {}, history: [], updatedAt: 0 });
+const emptyRun = () => ({ active: false, updatedAt: 0 });
+const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20 };
+const prefs = Object.assign({ sound: true, ru: false }, lsGet('cztest:prefs') || {});
+prefs.cfg = Object.assign({}, DEFAULT_CFG, prefs.cfg || {});
+prefs.cfg.cats = prefs.cfg.cats.filter(c => CATS.includes(c));
+if (!MODES[prefs.cfg.mode]) prefs.cfg.mode = 'snowball';
+const S = {
+  progress: emptyProgress(),
+  run: emptyRun(),
+  screen: 'setup',
+  sel: [],               // current selection before answering (not persisted)
+  confirm: null,         // which inline confirmation is open
+  resetText: '',
+};
+const savePrefs = () => lsSet('cztest:prefs', prefs);
+
+/* ---------- storage: shared db when writable, this device otherwise ---------- */
+const store = {
+  mode: 'connecting',    // connecting | shared | readonly | local
+  db: null, refs: {}, unsubs: [], writing: {}, again: {}, seen: {}, dirty: {},
+
+  async init() {
+    const mirror = lsGet('cztest:mirror');
+    const local = lsGet('cztest:local');
+    if (mirror) { S.progress = mirror.progress || S.progress; S.run = mirror.run || S.run; }
+    let db = null;
+    try { db = window.claude?.use ? await window.claude.use('db') : null; } catch { db = null; }
+    if (!db) return this.useLocal(local);
+    let canWrite = null;
+    try { const user = await window.claude.use('user'); canWrite = user ? await user.can('data.write') : null; } catch { canWrite = null; }
+    if (canWrite === false && local) return this.useLocal(local);
+    this.db = db;
+    this.mode = canWrite === false ? 'readonly' : 'shared';
+    this.refs.progress = db.doc('quiz/progress');
+    this.refs.run = db.doc('quiz/run');
+    for (const key of ['progress', 'run']) {
+      this.unsubs.push(this.refs[key].onSnapshot(snap => this.onSnap(key, snap), () => this.useLocalFromCurrent()));
+    }
+    renderChrome();
+  },
+
+  useLocal(local) {
+    this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
+    this.unsubs = [];
+    if (local) { S.progress = local.progress || emptyProgress(); S.run = local.run || emptyRun(); }
+    this.mode = 'local';
+    this.persistLocal();
+    if (S.run.active && !S.run.finished) S.screen = 'quiz';
+    renderChrome(); render();
+  },
+
+  onSnap(key, snap) {
+    if (this.mode === 'local') return;
+    const d = snap.exists ? snap.data() : null;
+    const first = !this.seen[key];
+    this.seen[key] = true;
+    const cur = key === 'progress' ? S.progress : S.run;
+    if (first && this.dirty[key] && (cur.updatedAt || 0) > (d?.updatedAt || 0)) {
+      // answered while still connecting: push the newer local state instead of dropping it
+      this.dirty[key] = false;
+      if (this.mode === 'shared') this.flush(key); else this.useLocalFromCurrent();
+      return;
+    }
+    if (!d) { if (first) { S[key] = key === 'progress' ? emptyProgress() : emptyRun(); } else return; }
+    else if (first || (d.updatedAt || 0) >= (cur.updatedAt || 0)) {
+      if (this.writing[key] && !first) return;   // our own newer write is on its way
+      S[key] = clone(d);
+    } else return;
+    lsSet('cztest:mirror', { progress: S.progress, run: S.run });
+    onRemoteChange(key, first);
+  },
+
+  save(key) {
+    const obj = key === 'progress' ? S.progress : S.run;
+    obj.updatedAt = Date.now();
+    if (this.mode === 'readonly') { this.useLocalFromCurrent(); return; }
+    if (this.mode === 'connecting') { this.dirty[key] = true; lsSet('cztest:mirror', { progress: S.progress, run: S.run }); return; }
+    if (this.mode === 'local') { this.persistLocal(); return; }
+    lsSet('cztest:mirror', { progress: S.progress, run: S.run });
+    this.flush(key);
+  },
+
+  async flush(key) {
+    if (this.writing[key]) { this.again[key] = true; return; }
+    this.writing[key] = true;
+    try {
+      do {
+        this.again[key] = false;
+        await this.write(key);
+      } while (this.again[key]);
+    } catch (e) {
+      if (e?.code === 'invalid_argument' || e?.code === 'not_granted' || e?.code === 'revoked' || e?.code === 'capability_disabled') this.useLocalFromCurrent();
+      else toast('Uložení se nepovedlo. Zkuste to prosím znovu.');
+    } finally { this.writing[key] = false; }
+  },
+
+  async write(key) {
+    const data = clone(key === 'progress' ? S.progress : S.run);
+    try { await this.refs[key].set(data); }
+    catch (e) {
+      if (e?.code !== 'unavailable') throw e;
+      await new Promise(r => setTimeout(r, 600 + Math.random() * 900));
+      await this.refs[key].set(data);
+    }
+  },
+
+  useLocalFromCurrent() {
+    this.unsubs.forEach(u => { try { u(); } catch { /* already closed */ } });
+    this.unsubs = [];
+    this.mode = 'local';
+    this.persistLocal();
+    renderChrome();
+  },
+
+  persistLocal() { lsSet('cztest:local', { progress: S.progress, run: S.run }); },
+};
+
+function onRemoteChange(key, first) {
+  if (key === 'run') {
+    if (first && S.run.active && !S.run.finished) S.screen = 'quiz';
+    const sig = runSig();
+    if (sig !== S.lastRunSig) { S.lastRunSig = sig; S.sel = []; if (S.screen !== 'stats') render(); }
+  } else if (S.screen !== 'quiz' || first) render();
+  renderChrome();
+}
+const runSig = () => { const r = S.run; return r.active ? `${r.id}:${r.pos}:${r.order.length}:${(r.log || []).filter(Boolean).length}:${r.finished}` : 'none'; };
+
+/* ---------- per-question statistics ---------- */
+const st = id => S.progress.q[id];
+function statusOf(id) {
+  const s = st(id);
+  if (!s || !s.s) return 'new';
+  if (s.k >= MASTERED_STREAK) return 'done';
+  if (s.w > 0) return 'err';
+  return 'learn';
+}
+function record(id, ok) {
+  const s = S.progress.q[id] || (S.progress.q[id] = { s: 0, r: 0, w: 0, k: 0, t: 0 });
+  s.s++; s.t = Date.now();
+  if (ok) { s.r++; s.k++; } else { s.w++; s.k = 0; }
+}
+const difficulty = s => (1 + 2 * s.w) / (1 + s.r) * (s.k >= MASTERED_STREAK ? 0.2 : 1);
+
+/* ---------- picking questions for a run ---------- */
+function filtered(cfg) {
+  return QS.filter(q => (!cfg.cats.length || cfg.cats.includes(q.category)) && (!cfg.kinds.length || cfg.kinds.includes(q.kind)));
+}
+function poolFor(mode, list) {
+  if (mode === 'errors') return list.filter(q => (st(q.id)?.w || 0) > 0);
+  if (mode === 'review') return list.filter(q => (st(q.id)?.r || 0) > 0);
+  return list;
+}
+function pick(mode, list, n) {
+  const pool = poolFor(mode, list);
+  let ranked;
+  if (mode === 'errors') {
+    // weighted sampling without replacement: the harder a question is for you, the likelier it comes up
+    ranked = pool.map(q => [q.id, Math.pow(Math.random(), 1 / difficulty(st(q.id)))]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+  } else if (mode === 'review') {
+    ranked = shuffle(pool.slice()).sort((a, b) => (st(a.id).t || 0) - (st(b.id).t || 0)).map(q => q.id);
+  } else {
+    ranked = shuffle(pool.slice()).sort((a, b) => (st(a.id)?.s || 0) - (st(b.id)?.s || 0)).map(q => q.id);
+  }
+  return shuffle(ranked.slice(0, n));
+}
+function countBounds(avail) {
+  const max = Math.min(COUNT_MAX, avail);
+  return { min: Math.min(COUNT_MIN, max), max };
+}
+
+/* ---------- run lifecycle ---------- */
+function startRun() {
+  const cfg = prefs.cfg;
+  const list = filtered(cfg);
+  const avail = poolFor(cfg.mode, list).length;
+  if (!avail) return;
+  const { min, max } = countBounds(avail);
+  const ids = pick(cfg.mode, list, clamp(cfg.count, min, max));
+  S.run = {
+    active: true, id: Date.now().toString(36), startedAt: Date.now(), mode: cfg.mode, hard: cfg.hard,
+    cats: cfg.cats.slice(), kinds: cfg.kinds.slice(), main: ids.length, order: ids, pos: 0, log: [],
+    firstOk: 0, firstBad: 0, finished: false, updatedAt: 0,
+  };
+  S.sel = []; S.confirm = null; S.screen = 'quiz'; S.lastRunSig = runSig();
+  store.save('run');
+  render(); window.scrollTo(0, 0);
+}
+function currentQ() {
+  const r = S.run;
+  while (r.pos < r.order.length && !QMAP[r.order[r.pos]]) r.pos++;   // skip questions removed from the bank
+  return r.pos < r.order.length ? QMAP[r.order[r.pos]] : null;
+}
+function submit() {
+  const r = S.run, q = currentQ();
+  if (!q || r.log[r.pos] || !S.sel.length) return;
+  const picked = S.sel.slice().sort((a, b) => a - b);
+  const ok = sameSet(picked, q.correct);
+  r.log[r.pos] = { p: picked, ok };
+  if (r.pos < r.main) ok ? r.firstOk++ : r.firstBad++;
+  if (!ok && !r.order.slice(r.pos + 1).includes(q.id)) r.order.push(q.id);   // ask again until answered correctly
+  record(q.id, ok);
+  playSound(ok);
+  S.lastRunSig = runSig();
+  store.save('run'); store.save('progress');
+  render();
+  if (!ok) $('.opts')?.classList.add('shake');
+  $('.verdict')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function next() {
+  const r = S.run;
+  if (!r.log[r.pos]) return;
+  r.pos++;
+  S.sel = [];
+  if (!currentQ()) finishRun();
+  S.lastRunSig = runSig();
+  store.save('run');
+  render(); window.scrollTo(0, 0);
+}
+function finishRun() {
+  const r = S.run;
+  r.finished = true;
+  r.mainDone = r.log.slice(0, r.main).filter(Boolean).length;
+  const h = S.progress.history;
+  h.push({ t: Date.now(), mode: r.mode, n: r.mainDone, ok: r.firstOk, extra: r.order.length - r.main, hard: !!r.hard });
+  if (h.length > HISTORY_LIMIT) h.splice(0, h.length - HISTORY_LIMIT);
+  store.save('progress');
+}
+function discardRun() {
+  S.run = emptyRun(); S.sel = []; S.confirm = null; S.lastRunSig = runSig();
+  store.save('run');
+}
+
+/* ---------- sound ---------- */
+let actx = null;
+function playSound(ok) {
+  if (!prefs.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t0 = actx.currentTime;
+    const notes = ok ? [[659.25, 0, .22], [987.77, .09, .3]] : [[196, 0, .22], [146.83, .13, .32]];
+    for (const [f, d, len] of notes) {
+      const o = actx.createOscillator(), g = actx.createGain(), lp = actx.createBiquadFilter();
+      o.type = ok ? 'sine' : 'sawtooth';
+      o.frequency.setValueAtTime(f, t0 + d);
+      lp.type = 'lowpass'; lp.frequency.value = ok ? 4000 : 700;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(ok ? 0.22 : 0.18, t0 + d + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + len);
+      o.connect(lp).connect(g).connect(actx.destination);
+      o.start(t0 + d); o.stop(t0 + d + len + 0.05);
+    }
+  } catch { /* audio unavailable */ }
+}
+
+/* ---------- chrome (header) ---------- */
+function renderChrome() {
+  const app = $('#app');
+  app.classList.toggle('show-ru', !!prefs.ru);
+  $('#ru-switch').setAttribute('aria-checked', String(!!prefs.ru));
+  const sb = $('#sound-btn');
+  sb.setAttribute('aria-checked', String(!!prefs.sound));
+  sb.innerHTML = prefs.sound ? ICON.soundOn : ICON.soundOff;
+  sb.title = prefs.sound ? 'Zvuky zapnuty' : 'Zvuky vypnuty';
+  $('#brand-sub').textContent = `${QS.length} ${plural(QS.length, 'otázka', 'otázky', 'otázek')} · ${CATS.length} ${plural(CATS.length, 'kategorie', 'kategorie', 'kategorií')}`;
+  const onQuiz = S.screen !== 'stats';
+  $('#tab-setup').setAttribute('aria-current', onQuiz ? 'page' : 'false');
+  $('#tab-stats').setAttribute('aria-current', onQuiz ? 'false' : 'page');
+  const pill = $('#store-pill');
+  const labels = {
+    connecting: ['Připojuji…', 'Načítám sdílený postup'],
+    shared: ['Sdílený postup', 'Postup vidí a ukládá každý, kdo otevře tento odkaz'],
+    readonly: ['Sdílený postup · jen čtení', 'Vaše odpovědi se uloží jen v tomto zařízení'],
+    local: ['Jen toto zařízení', 'Postup se ukládá pouze v tomto prohlížeči'],
+  };
+  const [label, title] = labels[store.mode];
+  pill.textContent = label; pill.title = title; pill.dataset.mode = store.mode;
+}
+
+/* ---------- views ---------- */
+function render() {
+  renderChrome();
+  const v = $('#view');
+  if (S.screen === 'stats') v.innerHTML = viewStats();
+  else if (S.screen === 'quiz' && S.run.active) v.innerHTML = S.run.finished ? viewResults() : viewQuiz();
+  else { S.screen = 'setup'; v.innerHTML = viewSetup(); }
+}
+
+function viewSetup() {
+  const cfg = prefs.cfg;
+  const list = filtered(cfg);
+  const avail = poolFor(cfg.mode, list).length;
+  const { min, max } = countBounds(avail);
+  const count = clamp(cfg.count, min, max);
+  const r = S.run;
+  const resume = r.active && !r.finished ? `
+    <div class="card resume stack">
+      <div>
+        <p class="section-label">${L('Rozpracovaný test', 'Незавершённый тест')}</p>
+        <h3>${esc(MODES[r.mode]?.cs || '')} · <span class="num">${Math.min(r.pos + 1, r.order.length)} / ${r.order.length}</span></h3>
+        <p class="small muted">${r.hard ? 'Těžký režim' : 'Lehký režim'} · zahájeno ${fmtDate(r.startedAt)}</p>
+      </div>
+      <div class="row">
+        <button type="button" class="btn primary" data-action="resume">${L('Pokračovat', 'Продолжить')}</button>
+        <button type="button" class="btn ghost sm" data-action="ask" data-what="discard">Zahodit</button>
+      </div>
+      ${S.confirm === 'discard' ? `<div class="confirm"><span>${L('Opravdu zahodit rozpracovaný test? Odpovědi zůstanou ve statistice.', 'Точно удалить незавершённый тест? Ответы останутся в статистике.')}</span>
+        <div class="row"><button type="button" class="btn danger sm" data-action="discard">Ano, zahodit</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Ne</button></div></div>` : ''}
+    </div>` : '';
+
+  const catChips = [`<button type="button" class="chip" data-action="cat" data-cat="" aria-pressed="${!cfg.cats.length}">${L('Všechny kategorie', 'Все категории')} <span class="count">${QS.length}</span></button>`]
+    .concat(CATS.map(c => {
+      const n = QS.filter(q => q.category === c).length;
+      const done = QS.filter(q => q.category === c && statusOf(q.id) === 'done').length;
+      return `<button type="button" class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${cfg.cats.includes(c)}">${esc(c)} <span class="count">${done}/${n}</span></button>`;
+    })).join('');
+  const kindChips = KINDS.map(k => `<button type="button" class="chip" data-action="kind" data-kind="${k.id}" aria-pressed="${!cfg.kinds.length || cfg.kinds.includes(k.id)}">${L(k.cs, k.ru)} <span class="count">${QS.filter(q => q.kind === k.id).length}</span></button>`).join('');
+
+  const modeCards = Object.entries(MODES).map(([id, m]) => {
+    const a = poolFor(id, list).length;
+    return `<button type="button" class="mode" role="radio" data-action="mode" data-mode="${id}" aria-checked="${cfg.mode === id}">
+      <span class="dot"></span><b>${L(m.cs, m.ru)}</b><span class="avail">${a} ${plural(a, 'otázka', 'otázky', 'otázek')}</span>
+      <span class="desc">${L(m.dcs, m.dru)}</span></button>`;
+  }).join('');
+
+  const emptyMsg = cfg.mode === 'errors' ? L('Zatím nemáte žádné chyby. Projeďte nejdřív sněhovou kouli.', 'Ошибок пока нет. Сначала пройдите «Снежный ком».')
+    : cfg.mode === 'review' ? L('Zatím nemáte žádné zvládnuté otázky k opakování.', 'Пока нет освоенных вопросов для повторения.')
+    : L('Výběru neodpovídá žádná otázka. Upravte kategorie nebo typy.', 'Под выбор не подходит ни один вопрос. Измените категории или типы.');
+  const startLabel = r.active && !r.finished ? L('Začít nový test', 'Начать новый тест') : L('Začít test', 'Начать тест');
+
+  return `
+  <div class="grid-2">
+    <div class="stack">
+      ${resume}
+      <section class="card stack">
+        <div><p class="section-label">${L('Kategorie', 'Категории')}</p><div class="chips">${catChips}</div></div>
+        <div><p class="section-label">${L('Typ otázek', 'Тип вопросов')}</p><div class="chips">${kindChips}</div></div>
+      </section>
+    </div>
+    <div class="stack">
+      <section class="card stack">
+        <div><p class="section-label">${L('Režim', 'Режим')}</p><div class="modes" role="radiogroup">${modeCards}</div></div>
+        <div>
+          <p class="section-label">${L('Obtížnost', 'Сложность')}</p>
+          <div class="seg" role="radiogroup">
+            <button type="button" role="radio" data-action="hard" data-val="0" aria-checked="${!cfg.hard}">Lehká</button>
+            <button type="button" role="radio" data-action="hard" data-val="1" aria-checked="${cfg.hard}">Těžká</button>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">${cfg.hard
+            ? L('U otázky neuvidíte, kolik odpovědí je správně. Vždy můžete označit více možností.', 'Не видно, сколько ответов правильные. Всегда можно отметить несколько вариантов.')
+            : L('U každé otázky uvidíte, zda má jednu, nebo více správných odpovědí a kolik.', 'У каждого вопроса видно, один в нём правильный ответ или несколько и сколько именно.')}</p>
+        </div>
+        <div>
+          <p class="section-label">${L('Počet otázek', 'Количество вопросов')}</p>
+          ${avail ? `<div class="count-row">
+            <input type="range" id="count" min="${min}" max="${max}" step="1" value="${count}" ${min === max ? 'disabled' : ''} aria-label="Počet otázek">
+            <span class="count-val" id="count-val">${count}</span>
+          </div>
+          <p class="small muted" style="margin:6px 0 0">K dispozici ${avail} ${plural(avail, 'otázka', 'otázky', 'otázek')}${avail < COUNT_MIN ? ' – v testu budou všechny' : ''}.</p>` : `<div class="empty">${emptyMsg}</div>`}
+        </div>
+        ${S.confirm === 'replace' ? `<div class="confirm"><span>${L('Nový test nahradí rozpracovaný. Pokračovat?', 'Новый тест заменит незавершённый. Продолжить?')}</span>
+          <div class="row"><button type="button" class="btn danger sm" data-action="start-force">Ano, začít nový</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Ne</button></div></div>` : ''}
+        <button type="button" class="btn primary block" data-action="start" ${avail ? '' : 'disabled'}>${startLabel}</button>
+      </section>
+    </div>
+  </div>`;
+}
+
+function viewQuiz() {
+  const r = S.run, q = currentQ();
+  if (!q) return viewResults();
+  const entry = r.log[r.pos];
+  const answered = !!entry;
+  const inFix = r.pos >= r.main;
+  const left = r.order.length - r.pos - (answered ? 1 : 0);
+  const showKind = !r.hard;
+  const nCorrect = q.correct.length;
+  const multiUI = r.hard || q.correct.length > 1;
+  const kindBadge = !showKind ? '' : q.correct.length > 1
+    ? `<span class="badge kind">Více odpovědí · ${nCorrect} ${plural(nCorrect, 'správná', 'správné', 'správných')}</span>`
+    : `<span class="badge kind">Jedna správná odpověď</span>`;
+  const sel = answered ? entry.p : S.sel;
+
+  const opts = q.options.map((o, i) => {
+    const picked = sel.includes(i), isCorrect = q.correct.includes(i);
+    let cls = '', mark = String(i + 1), note = '';
+    if (answered) {
+      if (picked && isCorrect) { cls = 'is-ok'; mark = ICON.check; note = 'Vaše odpověď · správně'; }
+      else if (picked) { cls = 'is-bad'; mark = ICON.cross; note = 'Vaše odpověď · špatně'; }
+      else if (isCorrect) { cls = 'is-missed'; mark = ICON.check; note = 'Správná odpověď'; }
+      else cls = 'is-dim';
+    }
+    return `<button type="button" class="opt ${cls}" data-action="opt" data-i="${i}" aria-pressed="${!answered && picked}" ${answered ? 'disabled' : ''}>
+      <span class="mk ${multiUI ? 'square' : 'round'}">${mark}</span>
+      <span>${tx(o)}${note ? `<span class="opt-note">${note}</span>` : ''}</span></button>`;
+  }).join('');
+
+  const verdict = !answered ? '' : entry.ok
+    ? `<div class="verdict ok"><span class="vi">${ICON.check}</span><div><strong>Správně!</strong>${L('Výborně, pokračujte.', 'Отлично, продолжайте.')}</div></div>`
+    : `<div class="verdict bad"><span class="vi">${ICON.cross}</span><div><strong>Špatně</strong>${L('Vaše odpověď je červeně, správná zeleně. Otázka se vám v tomto testu objeví znovu.', 'Ваш ответ выделен красным, правильный — зелёным. Этот вопрос в тесте появится снова.')}</div></div>`;
+  const explanation = answered && q.explanation ? `<div class="explain">${tx(q.explanation)}</div>` : '';
+  const mainDone = Math.min(r.pos + (answered ? 1 : 0), r.main);
+
+  return `
+  <div class="quiz">
+    <div class="qhead">
+      <span class="pos">${inFix ? 'Oprava' : `${r.pos + 1} / ${r.main}`}</span>
+      <span>${esc(MODES[r.mode]?.cs || '')} · ${r.hard ? 'těžká' : 'lehká'}</span>
+      <span style="margin-left:auto" class="row">
+        <span class="score ok" title="Správně napoprvé">${ICON.check}${r.firstOk}</span>
+        <span class="score bad" title="Chyby">${ICON.cross}${r.firstBad}</span>
+      </span>
+    </div>
+    <div class="pbar" aria-hidden="true"><i style="width:${pct(mainDone, r.main)}%"></i></div>
+    ${inFix ? `<div class="phase">${L(`Oprava chyb: ${answered ? 'zbývá ještě' : 'zbývá'} ${left}. Test skončí, až všechny chyby opravíte.`, `Работа над ошибками: осталось ${left}. Тест закончится, когда все ошибки будут исправлены.`)}</div>` : ''}
+    <div class="badges"><span class="badge">${esc(q.category)}</span>${q.kind === 'situation' ? '<span class="badge">Situace</span>' : ''}${kindBadge}</div>
+    ${q.scenario ? `<div class="scenario"><span class="lbl">Situace</span>${tx(q.scenario)}</div>` : ''}
+    <h2 class="qtext">${tx(q.question)}</h2>
+    <div class="opts">${opts}</div>
+    ${verdict}
+    ${explanation}
+    <div class="row" style="justify-content:space-between">
+      <span class="kbd-hint">Klávesy 1–${q.options.length} vyberou odpověď, Enter potvrdí.</span>
+      <span class="row" style="gap:16px"><button type="button" class="link-btn small" data-action="goto-setup">Výběr testu</button>
+      <button type="button" class="link-btn small" data-action="ask" data-what="end">Ukončit test</button></span>
+    </div>
+    ${S.confirm === 'end' ? `<div class="confirm"><span>${L('Ukončit test? Dosavadní odpovědi zůstanou ve statistice.', 'Завершить тест? Ответы останутся в статистике.')}</span>
+      <div class="row"><button type="button" class="btn danger sm" data-action="end">Ano, ukončit</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Ne</button></div></div>` : ''}
+  </div>
+  <div class="actionbar"><div class="actionbar-in">
+    ${answered
+      ? `<button type="button" class="btn primary" data-action="next">${r.pos + 1 >= r.order.length ? 'Dokončit test' : 'Další otázka'}</button>`
+      : `<button type="button" class="btn primary" data-action="submit" ${S.sel.length ? '' : 'disabled'}>Odpovědět</button>`}
+  </div></div>`;
+}
+
+function viewResults() {
+  const r = S.run;
+  const n = r.mainDone ?? r.main;
+  const score = pct(r.firstOk, n);
+  const wrongIds = [...new Set(r.order.slice(0, r.main).filter((id, i) => r.log[i] && !r.log[i].ok))];
+  const list = wrongIds.map(id => QMAP[id]).filter(Boolean);
+  return `
+  <div class="quiz">
+    <section class="card stack">
+      <p class="section-label">${L('Test dokončen', 'Тест завершён')}</p>
+      <div class="result-hero">
+        <span class="big">${score}<span style="font-size:.5em"> %</span></span>
+        <div>
+          <strong>${r.firstOk} z ${n}</strong> ${L('správně napoprvé', 'правильно с первого раза')}
+          <p class="small muted" style="margin:4px 0 0">${esc(MODES[r.mode]?.cs || '')} · ${r.hard ? 'těžká' : 'lehká'} · opravných otázek ${r.order.length - r.main}</p>
+        </div>
+      </div>
+      ${list.length ? `<div><p class="section-label">${n < r.main ? L('Chyby v tomto testu', 'Ошибки в этом тесте') : L('Chyby v tomto testu (všechny opraveny)', 'Ошибки в этом тесте (все исправлены)')}</p>
+        <ul class="qlist">${list.map(q => `<li>${tx(q.question)}<span class="badge">${esc(q.category)}</span></li>`).join('')}</ul></div>`
+        : `<p>${L('Bez jediné chyby. Skvělá práce!', 'Ни одной ошибки. Отличная работа!')}</p>`}
+    </section>
+  </div>
+  <div class="actionbar"><div class="actionbar-in">
+    <button type="button" class="btn" data-action="nav" data-screen="stats">Statistika</button>
+    <button type="button" class="btn primary" data-action="new">Nový test</button>
+  </div></div>`;
+}
+
+function statusCounts(qs) {
+  const c = { done: 0, learn: 0, err: 0, new: 0 };
+  qs.forEach(q => c[statusOf(q.id)]++);
+  return c;
+}
+function statBar(c, total, cls = '') {
+  const seg = (k) => c[k] ? `<i class="s-${k}" style="width:${c[k] / total * 100}%"></i>` : '';
+  return `<div class="statbar ${cls}" role="img" aria-label="Zvládnuto ${c.done}, rozpracováno ${c.learn}, chyby ${c.err}, nezodpovězeno ${c.new}">${seg('done')}${seg('learn')}${seg('err')}${seg('new')}</div>`;
+}
+
+function viewStats() {
+  const total = QS.length;
+  const c = statusCounts(QS);
+  const all = Object.values(S.progress.q);
+  const answers = all.reduce((a, s) => a + s.s, 0);
+  const right = all.reduce((a, s) => a + s.r, 0);
+  const hist = S.progress.history;
+  const recent = hist.slice(-24);
+
+  const legend = `<div class="legend">
+    <span><i class="sw s-done"></i>Zvládnuto <b class="num">${c.done}</b></span>
+    <span><i class="sw s-learn"></i>Rozpracováno <b class="num">${c.learn}</b></span>
+    <span><i class="sw s-err"></i>Chyby k opravě <b class="num">${c.err}</b></span>
+    <span><i class="sw s-new"></i>Nezodpovězeno <b class="num">${c.new}</b></span></div>`;
+
+  const cats = CATS.map(cat => {
+    const qs = QS.filter(q => q.category === cat);
+    const cc = statusCounts(qs);
+    return `<div class="cat-row"><span>${esc(cat)}</span><span class="num">${cc.done}/${qs.length}</span>${statBar(cc, qs.length, 'sm')}</div>`;
+  }).join('');
+
+  const chart = recent.length ? `
+    <div class="chart">
+      <div class="yax"><span>100 %</span><span>50 %</span><span>0 %</span></div>
+      <div class="plot">
+        <div class="grid-line" style="top:0"></div><div class="grid-line" style="top:50%"></div>
+        ${recent.map((h, i) => { const p = pct(h.ok, h.n); return `<div class="bar" data-tip="${i}" tabindex="0" aria-label="${fmtDate(h.t)}: ${p} %"><i style="height:${Math.max(p, 1)}%"></i></div>`; }).join('')}
+      </div>
+      <div class="xax"><span>${fmtDate(recent[0].t)}</span><span>${recent.length > 1 ? fmtDate(recent[recent.length - 1].t) : ''}</span></div>
+    </div>` : `<div class="empty">${L('Graf se zobrazí po prvním dokončeném testu.', 'График появится после первого завершённого теста.')}</div>`;
+
+  const hardest = QS.filter(q => (st(q.id)?.w || 0) > 0).sort((a, b) => difficulty(st(b.id)) - difficulty(st(a.id))).slice(0, 6);
+
+  return `
+  <div class="grid-2">
+    <div class="stack">
+      <section class="card stack">
+        <p class="section-label">${L('Celkový postup', 'Общий прогресс')}</p>
+        <div class="hero-num"><span class="big">${pct(c.done, total)}<span style="font-size:.5em"> %</span></span><span>${L(`zvládnuto ${c.done} z ${total} otázek`, `освоено ${c.done} из ${total} вопросов`)}</span></div>
+        ${statBar(c, total)}
+        ${legend}
+        <p class="small muted" style="margin:0">Otázka je zvládnutá, když na ni odpovíte správně ${MASTERED_STREAK}× za sebou.</p>
+        <div class="kpis">
+          <div class="kpi"><div class="v">${answers}</div><div class="l">odpovědí celkem</div></div>
+          <div class="kpi"><div class="v">${pct(right, answers)} %</div><div class="l">úspěšnost odpovědí</div></div>
+          <div class="kpi"><div class="v">${hist.length}</div><div class="l">dokončených testů</div></div>
+        </div>
+      </section>
+      <section class="card stack">
+        <p class="section-label">${L('Úspěšnost napoprvé v posledních testech', 'Успешность с первой попытки в последних тестах')}</p>
+        ${chart}
+      </section>
+    </div>
+    <div class="stack">
+      <section class="card stack">
+        <p class="section-label">${L('Podle kategorií', 'По категориям')}</p>
+        <div class="cat-rows">${cats}</div>
+      </section>
+      <section class="card stack hard-list">
+        <p class="section-label">${L('Nejtěžší otázky', 'Самые трудные вопросы')}</p>
+        ${hardest.length ? `<ul class="qlist">${hardest.map(q => { const s = st(q.id); return `<li>${tx(q.question)}<span class="num" title="chyby / správně">${s.w}× / ${s.r}×</span></li>`; }).join('')}</ul>`
+          : `<div class="empty">${L('Zatím žádné chyby.', 'Пока ошибок нет.')}</div>`}
+      </section>
+      <section class="card stack danger-zone">
+        <p class="section-label">${L('Smazání postupu', 'Сброс прогресса')}</p>
+        <p class="small muted" style="margin:0">${store.mode === 'shared' ? 'Smaže statistiku i rozpracovaný test pro všechny, kdo tento odkaz používají.' : 'Smaže statistiku i rozpracovaný test v tomto zařízení.'}</p>
+        ${S.confirm === 'reset' ? `<div class="confirm">
+            <label for="reset-input">${L('Pro potvrzení napište SMAZAT', 'Для подтверждения напишите SMAZAT')}</label>
+            <input id="reset-input" autocomplete="off" autocapitalize="characters" value="${esc(S.resetText)}">
+            <div class="row"><button type="button" class="btn danger sm" data-action="reset" id="reset-go" ${S.resetText.trim().toUpperCase() === 'SMAZAT' ? '' : 'disabled'}>Smazat veškerý postup</button>
+            <button type="button" class="btn ghost sm" data-action="ask" data-what="">Zrušit</button></div></div>`
+          : `<div><button type="button" class="btn sm" data-action="ask" data-what="reset">Smazat postup…</button></div>`}
+      </section>
+    </div>
+  </div>`;
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = $('#tooltip');
+  el.textContent = msg; el.hidden = false;
+  el.style.left = '50%'; el.style.top = 'auto'; el.style.bottom = 'calc(90px + env(safe-area-inset-bottom, 0px))'; el.style.transform = 'translateX(-50%)';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; el.style.bottom = ''; el.style.transform = ''; }, 3200);
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-action]');
+  if (!b || b.disabled) return;
+  const a = b.dataset.action, cfg = prefs.cfg;
+  switch (a) {
+    case 'nav':
+      S.screen = b.dataset.screen === 'stats' ? 'stats' : (S.run.active ? 'quiz' : 'setup');
+      if (b.dataset.screen === 'setup' && S.run.active && S.run.finished) S.screen = 'quiz';
+      S.confirm = null; render(); window.scrollTo(0, 0); return;
+    case 'cat': {
+      const c = b.dataset.cat;
+      if (!c) cfg.cats = [];
+      else cfg.cats = cfg.cats.includes(c) ? cfg.cats.filter(x => x !== c) : [...cfg.cats, c];
+      if (cfg.cats.length === CATS.length) cfg.cats = [];
+      break;
+    }
+    case 'kind': {
+      const k = b.dataset.kind;
+      let ks = cfg.kinds.length ? cfg.kinds.slice() : KINDS.map(x => x.id);
+      ks = ks.includes(k) ? ks.filter(x => x !== k) : [...ks, k];
+      cfg.kinds = ks.length === KINDS.length || !ks.length ? [] : ks;
+      break;
+    }
+    case 'mode': cfg.mode = b.dataset.mode; break;
+    case 'hard': cfg.hard = b.dataset.val === '1'; break;
+    case 'start':
+      if (S.run.active && !S.run.finished) { S.confirm = 'replace'; break; }
+      startRun(); return;
+    case 'start-force': startRun(); return;
+    case 'goto-setup': S.screen = 'setup'; S.confirm = null; render(); window.scrollTo(0, 0); return;
+    case 'resume': S.screen = 'quiz'; S.confirm = null; render(); window.scrollTo(0, 0); return;
+    case 'ask': S.confirm = b.dataset.what || null; S.resetText = ''; render();
+      if (S.confirm === 'reset') $('#reset-input')?.focus();
+      return;
+    case 'discard': discardRun(); render(); return;
+    case 'end':
+      S.confirm = null;
+      if (S.run.log.some(Boolean)) { finishRun(); store.save('run'); } else discardRun();
+      render(); window.scrollTo(0, 0); return;
+    case 'opt': toggleOpt(+b.dataset.i); return;
+    case 'submit': submit(); return;
+    case 'next': next(); return;
+    case 'new': discardRun(); S.screen = 'setup'; render(); window.scrollTo(0, 0); return;
+    case 'reset':
+      S.progress = emptyProgress(); S.run = emptyRun(); S.confirm = null; S.sel = []; S.lastRunSig = runSig();
+      store.save('progress'); store.save('run');
+      render(); toast('Postup byl smazán.'); return;
+    default: return;
+  }
+  savePrefs(); render();
+});
+
+function toggleOpt(i) {
+  const r = S.run, q = currentQ();
+  if (!q || r.log[r.pos]) return;
+  const multiUI = r.hard || q.correct.length > 1;
+  if (multiUI) S.sel = S.sel.includes(i) ? S.sel.filter(x => x !== i) : [...S.sel, i];
+  else S.sel = [i];
+  document.querySelectorAll('.opt').forEach(el => el.setAttribute('aria-pressed', String(S.sel.includes(+el.dataset.i))));
+  const sb = $('[data-action="submit"]');
+  if (sb) sb.disabled = !S.sel.length;
+}
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'count') {
+    prefs.cfg.count = +e.target.value; $('#count-val').textContent = e.target.value; savePrefs();
+  } else if (e.target.id === 'reset-input') {
+    S.resetText = e.target.value;
+    $('#reset-go').disabled = S.resetText.trim().toUpperCase() !== 'SMAZAT';
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (S.screen !== 'quiz' || !S.run.active || S.run.finished || e.target.matches('input, textarea')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const q = currentQ(); if (!q) return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= q.options.length) { toggleOpt(n - 1); e.preventDefault(); }
+  else if (e.key === 'Enter' && !e.target.closest('button')) { S.run.log[S.run.pos] ? next() : submit(); e.preventDefault(); }
+});
+
+$('#ru-switch').addEventListener('click', () => { prefs.ru = !prefs.ru; savePrefs(); renderChrome(); });
+$('#sound-btn').addEventListener('click', () => { prefs.sound = !prefs.sound; savePrefs(); renderChrome(); if (prefs.sound) playSound(true); });
+
+/* chart tooltip */
+function showTip(bar) {
+  const h = S.progress.history.slice(-24)[+bar.dataset.tip];
+  if (!h) return;
+  const tip = $('#tooltip');
+  tip.innerHTML = `<b>${new Date(h.t).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</b><br>
+    ${esc(MODES[h.mode]?.cs || '')} · ${h.hard ? 'těžká' : 'lehká'}<br>
+    Napoprvé správně <span class="num">${h.ok}/${h.n}</span> (<span class="num">${pct(h.ok, h.n)} %</span>)`;
+  tip.style.bottom = ''; tip.style.transform = '';
+  tip.hidden = false;
+  const rc = bar.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = clamp(rc.left + rc.width / 2 - tw / 2, 8, window.innerWidth - tw - 8) + 'px';
+  tip.style.top = Math.max(8, rc.top - th - 8) + 'px';
+  document.querySelectorAll('.bar.on').forEach(x => x.classList.remove('on'));
+  bar.classList.add('on');
+}
+function hideTip() { $('#tooltip').hidden = true; document.querySelectorAll('.bar.on').forEach(x => x.classList.remove('on')); }
+document.addEventListener('pointerover', e => { const b = e.target.closest('.bar[data-tip]'); if (b) showTip(b); });
+document.addEventListener('pointerout', e => { if (e.target.closest('.bar[data-tip]')) hideTip(); });
+document.addEventListener('focusin', e => { const b = e.target.closest('.bar[data-tip]'); if (b) showTip(b); });
+document.addEventListener('focusout', e => { if (e.target.closest('.bar[data-tip]')) hideTip(); });
+window.addEventListener('scroll', () => { if (!$('#tooltip').hidden && $('.bar.on')) hideTip(); }, { passive: true });
+
+/* ---------- boot ---------- */
+S.lastRunSig = runSig();
+store.init().then(() => { if (store.mode !== 'local') render(); });
+if (S.run.active && !S.run.finished) S.screen = 'quiz';
+render();
+})();
+
+</script>

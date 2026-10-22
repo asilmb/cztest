@@ -1,0 +1,142 @@
+[
+  {
+    "id": "q001",
+    "category": "Historie",
+    "type": "single",
+    "question": { "cs": "Ve kterém roce vznikla samostatná Československá republika?", "ru": "В каком году была образована независимая Чехословацкая республика?" },
+    "options": [
+      { "cs": "1918", "ru": "1918" },
+      { "cs": "1945", "ru": "1945" },
+      { "cs": "1968", "ru": "1968" },
+      { "cs": "1993", "ru": "1993" }
+    ],
+    "correct": [0],
+    "explanation": { "cs": "Československo vzniklo 28. října 1918.", "ru": "Чехословакия была образована 28 октября 1918 года." }
+  },
+  {
+    "id": "q002",
+    "category": "Zeměpis",
+    "type": "single",
+    "question": { "cs": "Jak se jmenuje nejvyšší hora České republiky?", "ru": "Как называется самая высокая гора Чехии?" },
+    "options": [
+      { "cs": "Praděd", "ru": "Прадед" },
+      { "cs": "Sněžka", "ru": "Снежка" },
+      { "cs": "Lysá hora", "ru": "Лыса-Гора" },
+      { "cs": "Ještěd", "ru": "Ештед" }
+    ],
+    "correct": [1],
+    "explanation": { "cs": "Sněžka v Krkonoších měří 1 603 m n. m.", "ru": "Снежка в Крконоше — 1603 м над уровнем моря." }
+  },
+  {
+    "id": "q003",
+    "category": "Zeměpis",
+    "type": "multi",
+    "question": { "cs": "Se kterými státy sousedí Česká republika?", "ru": "С какими государствами граничит Чехия?" },
+    "options": [
+      { "cs": "Německo", "ru": "Германия" },
+      { "cs": "Rakousko", "ru": "Австрия" },
+      { "cs": "Maďarsko", "ru": "Венгрия" },
+      { "cs": "Polsko", "ru": "Польша" },
+      { "cs": "Slovensko", "ru": "Словакия" }
+    ],
+    "correct": [0, 1, 3, 4]
+  },
+  {
+    "id": "q004",
+    "category": "Stát a společnost",
+    "type": "single",
+    "question": { "cs": "Kdo jmenuje předsedu vlády České republiky?", "ru": "Кто назначает председателя правительства Чехии?" },
+    "options": [
+      { "cs": "Prezident republiky", "ru": "Президент республики" },
+      { "cs": "Senát", "ru": "Сенат" },
+      { "cs": "Poslanecká sněmovna", "ru": "Палата депутатов" },
+      { "cs": "Ústavní soud", "ru": "Конституционный суд" }
+    ],
+    "correct": [0]
+  },
+  {
+    "id": "q005",
+    "category": "Stát a společnost",
+    "type": "multi",
+    "question": { "cs": "Které z těchto dnů jsou v České republice státním svátkem?", "ru": "Какие из этих дней являются государственными праздниками в Чехии?" },
+    "options": [
+      { "cs": "28. října", "ru": "28 октября" },
+      { "cs": "14. února", "ru": "14 февраля" },
+      { "cs": "17. listopadu", "ru": "17 ноября" },
+      { "cs": "5. července", "ru": "5 июля" },
+      { "cs": "1. dubna", "ru": "1 апреля" }
+    ],
+    "correct": [0, 2, 3],
+    "explanation": { "cs": "28. 10. Den vzniku samostatného československého státu, 17. 11. Den boje za svobodu a demokracii, 5. 7. Den slovanských věrozvěstů Cyrila a Metoděje.", "ru": "28.10 — День образования Чехословакии, 17.11 — День борьбы за свободу и демократию, 5.7 — День славянских просветителей Кирилла и Мефодия." }
+  },
+  {
+    "id": "q006",
+    "category": "Kultura",
+    "type": "single",
+    "question": { "cs": "Kdo složil cyklus symfonických básní Má vlast?", "ru": "Кто написал цикл симфонических поэм «Моя родина»?" },
+    "options": [
+      { "cs": "Antonín Dvořák", "ru": "Антонин Дворжак" },
+      { "cs": "Leoš Janáček", "ru": "Леош Яначек" },
+      { "cs": "Bedřich Smetana", "ru": "Бедржих Сметана" },
+      { "cs": "Bohuslav Martinů", "ru": "Богуслав Мартину" }
+    ],
+    "correct": [2]
+  },
+  {
+    "id": "q007",
+    "category": "Kultura",
+    "type": "multi",
+    "question": { "cs": "Kteří z těchto autorů jsou čeští spisovatelé?", "ru": "Кто из этих авторов — чешские писатели?" },
+    "options": [
+      { "cs": "Karel Čapek", "ru": "Карел Чапек" },
+      { "cs": "Franz Schubert", "ru": "Франц Шуберт" },
+      { "cs": "Jaroslav Hašek", "ru": "Ярослав Гашек" },
+      { "cs": "Božena Němcová", "ru": "Божена Немцова" }
+    ],
+    "correct": [0, 2, 3]
+  },
+  {
+    "id": "q008",
+    "category": "Každodenní život",
+    "type": "situation",
+    "scenario": { "cs": "Na ulici vidíte člověka, který upadl, nereaguje na oslovení a nedýchá.", "ru": "На улице вы видите человека, который упал, не реагирует на обращение и не дышит." },
+    "question": { "cs": "Které číslo zavoláte jako první?", "ru": "По какому номеру вы позвоните в первую очередь?" },
+    "options": [
+      { "cs": "155 – zdravotnická záchranná služba", "ru": "155 — скорая медицинская помощь" },
+      { "cs": "158 – policie", "ru": "158 — полиция" },
+      { "cs": "150 – hasiči", "ru": "150 — пожарные" },
+      { "cs": "156 – městská policie", "ru": "156 — муниципальная полиция" }
+    ],
+    "correct": [0],
+    "explanation": { "cs": "Zdravotnickou záchrannou službu zavoláte na 155, případně na jednotné evropské číslo 112.", "ru": "Скорую помощь вызывают по номеру 155 или по единому европейскому номеру 112." }
+  },
+  {
+    "id": "q009",
+    "category": "Úřady",
+    "type": "situation",
+    "scenario": { "cs": "Ztratil(a) jste peněženku a v ní průkaz o povolení k pobytu.", "ru": "Вы потеряли кошелёк, в котором была карта вида на жительство." },
+    "question": { "cs": "Co je správné udělat?", "ru": "Как правильно поступить?" },
+    "options": [
+      { "cs": "Ztrátu co nejdříve nahlásit policii", "ru": "Как можно скорее сообщить о потере в полицию" },
+      { "cs": "Požádat Ministerstvo vnitra o vydání nového průkazu", "ru": "Подать в Министерство внутренних дел заявление о выдаче новой карты" },
+      { "cs": "Počkat rok, jestli se průkaz nenajde", "ru": "Подождать год, вдруг карта найдётся" },
+      { "cs": "Nic nedělat, průkaz není potřeba", "ru": "Ничего не делать, карта не нужна" }
+    ],
+    "correct": [0, 1]
+  },
+  {
+    "id": "q010",
+    "category": "Úřady",
+    "type": "situation",
+    "scenario": { "cs": "Jako cizinec s povolením k pobytu jste se přestěhoval(a) do bytu v jiném městě.", "ru": "Вы — иностранец с видом на жительство и переехали в квартиру в другом городе." },
+    "question": { "cs": "Komu musíte změnu adresy nahlásit?", "ru": "Кому нужно сообщить о смене адреса?" },
+    "options": [
+      { "cs": "Ministerstvu vnitra (Odboru azylové a migrační politiky)", "ru": "Министерству внутренних дел (Отделу по вопросам убежища и миграции)" },
+      { "cs": "Finančnímu úřadu", "ru": "Налоговой инспекции" },
+      { "cs": "Sousedům v domě", "ru": "Соседям по дому" },
+      { "cs": "Nikomu, změna adresy se nehlásí", "ru": "Никому, о смене адреса не сообщают" }
+    ],
+    "correct": [0],
+    "explanation": { "cs": "Změnu místa pobytu je třeba nahlásit do 30 dnů.", "ru": "О смене места проживания нужно сообщить в течение 30 дней." }
+  }
+]
