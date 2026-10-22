@@ -56,8 +56,8 @@ const KINDS = [
   { id: 'multi', cs: 'Více odpovědí', ru: 'Несколько ответов' },
   { id: 'situation', cs: 'Situace', ru: 'Ситуации' },
 ];
-const HINT_EASY = 'У каждого вопроса написано, один в нём правильный ответ или несколько и сколько именно. Если ответ один, вариант выбирается кружком.';
-const HINT_HARD = 'Не видно, сколько ответов правильные. У всех вопросов квадратики, и можно отметить любое число вариантов, поэтому угадать по виду вопроса нельзя.';
+const HINT_EASY = 'У каждого вопроса написано, сколько в нём правильных ответов. Ответ засчитывается сразу: в вопросе с одним ответом — по первому нажатию, с несколькими — как только отмечено нужное число вариантов.';
+const HINT_HARD = 'Не видно, сколько ответов правильные. Отметьте все варианты, которые считаете верными, и нажмите «Ответить».';
 const MODES = {
   snowball: { cs: 'Sněhová koule', ru: 'Снежный ком',
     dcs: 'Projede všechny otázky bez ohledu na výsledky. Přednost mají ty, které jste viděli nejméně.',
@@ -384,7 +384,7 @@ function submit() {
   store.save('run'); store.save('progress');
   render();
   if (!ok) $('.opts')?.classList.add('shake');
-  $('.verdict')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  $('.answer-bar')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 function next() {
   const r = S.run;
@@ -479,11 +479,13 @@ function localBanner() {
 }
 
 function render() {
+  hideTip();
   renderChrome();
   const v = $('#view');
-  if (S.screen === 'stats') v.innerHTML = localBanner() + viewStats();
+  const status = `<p class="store-line" data-mode="${store.mode}">${esc($('#store-pill').textContent)}</p>`;
+  if (S.screen === 'stats') v.innerHTML = localBanner() + status + viewStats();
   else if (S.screen === 'quiz' && S.run.active) v.innerHTML = localBanner() + (S.run.finished ? viewResults() : viewQuiz());
-  else { S.screen = 'setup'; v.innerHTML = localBanner() + viewSetup(); }
+  else { S.screen = 'setup'; v.innerHTML = localBanner() + status + viewSetup(); }
 }
 
 function viewSetup() {
@@ -542,14 +544,15 @@ function viewSetup() {
         <div><p class="section-label">${L('Režim', 'Режим')}</p><div class="modes" role="radiogroup">${modeCards}</div></div>
         <div>
           <p class="section-label label-row">${L('Obtížnost', 'Сложность')}
-            <button type="button" class="hint-btn" data-hint="${esc(`<b>Лёгкий</b><br>${HINT_EASY}<br><br><b>Сложный</b><br>${HINT_HARD}`)}" aria-label="Что означают уровни сложности">?</button></p>
+            <button type="button" class="hint-btn" data-action="hint" aria-expanded="${!!S.hintOpen}" aria-controls="level-hint" aria-label="Что означают уровни сложности">?</button></p>
+          ${S.hintOpen ? `<div class="hint-panel" id="level-hint"><p><b>Лёгкий.</b> ${HINT_EASY}</p><p><b>Сложный.</b> ${HINT_HARD}</p></div>` : ''}
           <div class="seg" role="radiogroup">
-            <button type="button" role="radio" data-action="hard" data-val="0" aria-checked="${!cfg.hard}" data-hint="${esc(`<b>Лёгкий</b><br>${HINT_EASY}`)}">Лёгкий</button>
-            <button type="button" role="radio" data-action="hard" data-val="1" aria-checked="${cfg.hard}" data-hint="${esc(`<b>Сложный</b><br>${HINT_HARD}`)}">Сложный</button>
+            <button type="button" role="radio" data-action="hard" data-val="0" aria-checked="${!cfg.hard}">Лёгкий</button>
+            <button type="button" role="radio" data-action="hard" data-val="1" aria-checked="${cfg.hard}">Сложный</button>
           </div>
           <p class="small muted" style="margin:8px 0 0">${cfg.hard
-            ? L('U otázky neuvidíte, kolik odpovědí je správně. Vždy můžete označit více možností.', 'Не видно, сколько ответов правильные. Всегда можно отметить несколько вариантов.')
-            : L('U každé otázky uvidíte, zda má jednu, nebo více správných odpovědí a kolik.', 'У каждого вопроса видно, один в нём правильный ответ или несколько и сколько именно.')}</p>
+            ? L('', 'Не видно, сколько ответов правильные. Отмечаете варианты и нажимаете «Ответить».')
+            : L('', 'Видно, сколько ответов правильные. Ответ засчитывается сразу по нажатию.')}</p>
         </div>
         <div>
           <p class="section-label">${L('Počet otázek', 'Количество вопросов')}</p>
@@ -586,8 +589,8 @@ function viewQuiz() {
     const picked = sel.includes(i), isCorrect = q.correct.includes(i);
     let cls = '', mark = String(i + 1), note = '';
     if (answered) {
-      if (picked && isCorrect) { cls = 'is-ok'; mark = ICON.check; note = 'Ваш ответ · верно'; }
-      else if (picked) { cls = 'is-bad'; mark = ICON.cross; note = 'Ваш ответ · неверно'; }
+      if (picked && isCorrect) { cls = 'is-ok'; mark = ICON.check; }
+      else if (picked) { cls = 'is-bad'; mark = ICON.cross; note = 'Ваш ответ'; }
       else if (isCorrect) { cls = 'is-missed'; mark = ICON.check; note = 'Правильный ответ'; }
       else cls = 'is-dim';
     }
@@ -596,9 +599,14 @@ function viewQuiz() {
       <span>${tx(o)}${note ? `<span class="opt-note">${note}</span>` : ''}</span></button>`;
   }).join('');
 
-  const verdict = !answered ? '' : entry.ok
-    ? `<div class="verdict ok"><span class="vi">${ICON.check}</span><div><strong>Правильно!</strong>${L('Výborně, pokračujte.', 'Отлично, продолжайте.')}</div></div>`
-    : `<div class="verdict bad"><span class="vi">${ICON.cross}</span><div><strong>Неправильно</strong>${L('Vaše odpověď je červeně, správná zeleně. Otázka se vám v tomto testu objeví znovu.', 'Ваш ответ выделен красным, правильный — зелёным. Этот вопрос в тесте появится снова.')}</div></div>`;
+  const last = r.pos + 1 >= r.order.length;
+  const bar = answered
+    ? `<div class="answer-bar ${entry.ok ? 'ok' : 'bad'}">
+        <span class="verdict"><span class="vi">${entry.ok ? ICON.check : ICON.cross}</span><span><strong>${entry.ok ? 'Правильно!' : 'Неправильно'}</strong>${entry.ok ? '' : '<small>Вопрос повторится в этом тесте</small>'}</span></span>
+        <button type="button" class="btn primary" data-action="next">${last ? 'Завершить' : 'Дальше'}</button></div>`
+    : r.hard
+      ? `<div class="answer-bar"><span class="pick-hint">Отметьте все правильные варианты</span><button type="button" class="btn primary" data-action="submit" ${S.sel.length ? '' : 'disabled'}>Ответить</button></div>`
+      : q.correct.length > 1 ? `<div class="answer-bar"><span class="pick-hint" id="pick-hint">${pickHint(q)}</span></div>` : '';
   const explanation = answered && q.explanation ? `<div class="explain">${tx(q.explanation)}</div>` : '';
   const mainDone = Math.min(r.pos + (answered ? 1 : 0), r.main);
 
@@ -615,24 +623,19 @@ function viewQuiz() {
     <div class="pbar" aria-hidden="true"><i style="width:${pct(mainDone, r.main)}%"></i></div>
     ${inFix ? `<div class="phase">${L(`Oprava chyb: ${answered ? 'zbývá ještě' : 'zbývá'} ${left}. Test skončí, až všechny chyby opravíte.`, `Работа над ошибками: осталось ${left}. Тест закончится, когда все ошибки будут исправлены.`)}</div>` : ''}
     <div class="badges"><span class="badge">${esc(q.category)}</span>${q.kind === 'situation' ? '<span class="badge">Ситуация</span>' : ''}${kindBadge}</div>
-    ${q.scenario ? `<div class="scenario"><span class="lbl">Ситуация</span>${tx(q.scenario)}</div>` : ''}
+    ${q.scenario ? `<div class="scenario">${tx(q.scenario)}</div>` : ''}
     <h2 class="qtext">${tx(q.question)}</h2>
     <div class="opts">${opts}</div>
-    ${verdict}
+    ${bar}
     ${explanation}
     <div class="row" style="justify-content:space-between">
-      <span class="kbd-hint">Клавиши 1–${q.options.length} выбирают ответ, Enter подтверждает.</span>
+      <span class="kbd-hint">Клавиши 1–${q.options.length} выбирают ответ, Enter — дальше.</span>
       <span class="row" style="gap:16px"><button type="button" class="link-btn small" data-action="goto-setup">Выбор теста</button>
       <button type="button" class="link-btn small" data-action="ask" data-what="end">Завершить тест</button></span>
     </div>
     ${S.confirm === 'end' ? `<div class="confirm"><span>${L('Ukončit test? Dosavadní odpovědi zůstanou ve statistice.', 'Завершить тест? Ответы останутся в статистике.')}</span>
       <div class="row"><button type="button" class="btn danger sm" data-action="end">Да, завершить</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Нет</button></div></div>` : ''}
-  </div>
-  <div class="actionbar"><div class="actionbar-in">
-    ${answered
-      ? `<button type="button" class="btn primary" data-action="next">${r.pos + 1 >= r.order.length ? 'Завершить тест' : 'Следующий вопрос'}</button>`
-      : `<button type="button" class="btn primary" data-action="submit" ${S.sel.length ? '' : 'disabled'}>Ответить</button>`}
-  </div></div>`;
+  </div>`;
 }
 
 function viewResults() {
@@ -656,6 +659,7 @@ function viewResults() {
         <ul class="qlist">${list.map(q => `<li>${tx(q.question)}<span class="badge">${esc(q.category)}</span></li>`).join('')}</ul></div>`
         : `<p>${L('Bez jediné chyby. Skvělá práce!', 'Ни одной ошибки. Отличная работа!')}</p>`}
     </section>
+    <div class="actionbar-spacer"></div>
   </div>
   <div class="actionbar"><div class="actionbar-in">
     <button type="button" class="btn" data-action="nav" data-screen="stats">Статистика</button>
@@ -789,6 +793,7 @@ document.addEventListener('click', e => {
       if (S.run.active && !S.run.finished) { S.confirm = 'replace'; break; }
       startRun(); return;
     case 'start-force': startRun(); return;
+    case 'hint': S.hintOpen = !S.hintOpen; render(); return;
     case 'close-banner': S.bannerClosed = true; render(); return;
     case 'goto-setup': S.screen = 'setup'; S.confirm = null; render(); window.scrollTo(0, 0); return;
     case 'resume': S.screen = 'quiz'; S.confirm = null; render(); window.scrollTo(0, 0); return;
@@ -814,15 +819,19 @@ document.addEventListener('click', e => {
 });
 
 let selTimer;
+const pickHint = q => { const n = q.correct.length - S.sel.length; return `Отметьте ещё ${n} ${plural(n, 'вариант', 'варианта', 'вариантов')}`; };
 function toggleOpt(i) {
   const r = S.run, q = currentQ();
   if (!q || r.log[r.pos]) return;
   const multiUI = r.hard || q.correct.length > 1;
   if (multiUI) S.sel = S.sel.includes(i) ? S.sel.filter(x => x !== i) : [...S.sel, i];
   else S.sel = [i];
+  if (!r.hard && S.sel.length >= q.correct.length) { submit(); return; }
   document.querySelectorAll('.opt').forEach(el => el.setAttribute('aria-pressed', String(S.sel.includes(+el.dataset.i))));
   const sb = $('[data-action="submit"]');
   if (sb) sb.disabled = !S.sel.length;
+  const ph = $('#pick-hint');
+  if (ph) ph.textContent = pickHint(q);
   // keep the ticked options too, so another device opens on exactly the same screen
   clearTimeout(selTimer);
   const runId = r.id, pos = r.pos;
@@ -870,25 +879,11 @@ function showTip(bar) {
   bar.classList.add('on');
 }
 function hideTip() { if (!$('#tooltip').hidden && toastTimer && $('#tooltip').style.bottom) return; $('#tooltip').hidden = true; document.querySelectorAll('.bar.on').forEach(x => x.classList.remove('on')); }
-let hintOpen = null;
-document.addEventListener('pointerover', e => {
-  const b = e.target.closest('.bar[data-tip]'); if (b) return showTip(b);
-  const h = e.target.closest('[data-hint]');
-  if (h && e.pointerType === 'mouse') placeTip(h, h.dataset.hint);
-});
-document.addEventListener('pointerout', e => {
-  if (e.target.closest('.bar[data-tip]')) hideTip();
-  else if (e.target.closest('[data-hint]') && e.pointerType === 'mouse' && !hintOpen) hideTip();
-});
+document.addEventListener('pointerover', e => { const b = e.target.closest('.bar[data-tip]'); if (b) showTip(b); });
+document.addEventListener('pointerout', e => { if (e.target.closest('.bar[data-tip]')) hideTip(); });
 document.addEventListener('focusin', e => { const b = e.target.closest('.bar[data-tip]'); if (b) showTip(b); });
-document.addEventListener('focusout', e => { if (e.target.closest('.bar[data-tip], [data-hint]')) { hintOpen = null; hideTip(); } });
-// tap on the "?" button opens the hint on touch screens; any other tap closes it
-document.addEventListener('click', e => {
-  const b = e.target.closest('.hint-btn');
-  if (b) { if (hintOpen === b) { hintOpen = null; hideTip(); } else { hintOpen = b; placeTip(b, b.dataset.hint); } return; }
-  if (hintOpen) { hintOpen = null; hideTip(); }
-}, true);
-window.addEventListener('scroll', () => { if (!$('#tooltip').hidden && ($('.bar.on') || hintOpen)) { hintOpen = null; hideTip(); } }, { passive: true });
+document.addEventListener('focusout', e => { if (e.target.closest('.bar[data-tip]')) hideTip(); });
+window.addEventListener('scroll', () => { if ($('.bar.on')) hideTip(); }, { passive: true });
 
 /* ---------- boot ---------- */
 S.lastRunSig = runSig();
