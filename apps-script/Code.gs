@@ -13,29 +13,29 @@
  *                      { ok: false, stale: true, [key]: storedCopy }
  */
 
-const KEYS = ['progress', 'run'];
-const DATA_SHEET = 'data';
-const STATS_SHEET = 'Статистика';
-const CHUNK = 40000;
-const PREFIX = '~'; // keeps the sheet from reading a chunk as a number or a formula
+var KEYS = ['progress', 'run'];
+var DATA_SHEET = 'data';
+var STATS_SHEET = 'Статистика';
+var CHUNK = 40000;
+var PREFIX = '~'; // keeps the sheet from reading a chunk as a number or a formula
 
 function doGet() {
   return json_({ progress: read_('progress'), run: read_('run') });
 }
 
 function doPost(e) {
-  let body;
+  var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ error: 'bad json' }); }
-  const key = body && body.key;
-  const data = body && body.data;
+  var key = body && body.key;
+  var data = body && body.data;
   if (KEYS.indexOf(key) < 0 || !data || typeof data !== 'object') return json_({ error: 'bad request' });
 
-  const lock = LockService.getScriptLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    const stored = read_(key);
+    var stored = read_(key);
     if (stored && (stored.updatedAt || 0) > (data.updatedAt || 0)) {
-      const out = { ok: false, stale: true };
+      var out = { ok: false, stale: true };
       out[key] = stored;
       return json_(out);
     }
@@ -48,18 +48,18 @@ function doPost(e) {
 }
 
 function sheet_(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
   return ss.getSheetByName(name) || ss.insertSheet(name);
 }
 
 function rows_() {
-  const sh = sheet_(DATA_SHEET);
-  const n = sh.getLastRow();
+  var sh = sheet_(DATA_SHEET);
+  var n = sh.getLastRow();
   return n ? sh.getRange(1, 1, n, 3).getValues() : [];
 }
 
 function read_(key) {
-  const parts = rows_().filter(function (r) { return r[0] === key; })
+  var parts = rows_().filter(function (r) { return r[0] === key; })
     .sort(function (a, b) { return a[1] - b[1]; })
     .map(function (r) { return String(r[2]).slice(PREFIX.length); });
   if (!parts.length) return null;
@@ -67,20 +67,20 @@ function read_(key) {
 }
 
 function write_(key, data) {
-  const text = JSON.stringify(data);
-  const keep = rows_().filter(function (r) { return r[0] !== key && r[0] !== ''; });
-  for (let i = 0, n = 0; i < text.length; i += CHUNK, n++) keep.push([key, n, PREFIX + text.slice(i, i + CHUNK)]);
-  const sh = sheet_(DATA_SHEET);
+  var text = JSON.stringify(data);
+  var keep = rows_().filter(function (r) { return r[0] !== key && r[0] !== ''; });
+  for (var i = 0, n = 0; i < text.length; i += CHUNK, n++) keep.push([key, n, PREFIX + text.slice(i, i + CHUNK)]);
+  var sh = sheet_(DATA_SHEET);
   sh.clearContents();
   if (keep.length) sh.getRange(1, 1, keep.length, 3).setNumberFormat('@').setValues(keep);
 }
 
 function writeStats_(progress) {
-  const sh = sheet_(STATS_SHEET);
-  const q = progress.q || {};
-  const rows = [['Вопрос', 'Показов', 'Верно', 'Ошибок', 'Верно подряд', 'Последний ответ']];
+  var sh = sheet_(STATS_SHEET);
+  var q = progress.q || {};
+  var rows = [['Вопрос', 'Показов', 'Верно', 'Ошибок', 'Верно подряд', 'Последний ответ']];
   Object.keys(q).sort().forEach(function (id) {
-    const s = q[id];
+    var s = q[id];
     rows.push([id, s.s || 0, s.r || 0, s.w || 0, s.k || 0, s.t ? new Date(s.t) : '']);
   });
   sh.clearContents();
