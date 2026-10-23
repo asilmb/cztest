@@ -709,7 +709,7 @@ function viewQuiz() {
     ${(() => {
       const long = T(q.question).cs.length > LONG_TEXT;
       const open = !long || S.qOpen === `${r.id}:${r.pos}`;
-      return `<h2 class="qtext ${open ? '' : 'clamped'}" id="qtext">${tx(q.question)}</h2>
+      return `<h2 class="qtext ${open ? '' : 'clamped'}" id="qtext">${tx(q.question)}</h2>${T(q.question).ru ? '' : '<p class="no-ru">Русского перевода для этого вопроса пока нет.</p>'}
         ${long ? `<button type="button" class="more-btn" data-action="qtoggle" aria-controls="qtext" aria-expanded="${open}">${open ? 'Свернуть вопрос' : 'Показать вопрос полностью'}</button>` : ''}`;
     })()}
     <div class="opts">${opts}</div>
@@ -956,7 +956,11 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Enter' && !e.target.closest('button')) { S.run.log[S.run.pos] ? next() : submit(); e.preventDefault(); }
 });
 
-$('#ru-switch').addEventListener('click', () => { prefs.ru = !prefs.ru; savePrefs(); renderChrome(); });
+$('#ru-switch').addEventListener('click', () => {
+  prefs.ru = !prefs.ru; savePrefs(); renderChrome();
+  const q = S.screen === 'quiz' && S.run.active && !S.run.finished ? currentQ() : null;
+  if (prefs.ru && (q ? !T(q.question).ru : !QS.some(x => T(x.question).ru))) toast(q ? 'У этого вопроса пока нет русского перевода.' : 'У вопросов пока нет русского перевода.');
+});
 $('#sound-btn').addEventListener('click', () => { prefs.sound = !prefs.sound; savePrefs(); renderChrome(); if (prefs.sound) playSound(true); });
 
 /* tooltips: chart bars and difficulty hints */
