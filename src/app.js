@@ -89,7 +89,7 @@ const emptyProgress = () => ({ v: 1, q: {}, history: [], bank: { id: BUILD.bank,
 const emptyRun = () => ({ active: false, updatedAt: 0 });
 const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20, caseCount: 3 };
 const prefs = Object.assign({ sound: true, ru: false, font: 1 }, lsGet('cztest:prefs') || {});
-prefs.dict = Object.assign({ dir: 'tm', speed: 1, count: 20 }, prefs.dict || {});
+prefs.dict = Object.assign({ dir: 'tm', speed: 1, count: 20, autoSpeak: false }, prefs.dict || {});
 if (!FONT_STEPS.includes(prefs.font)) prefs.font = 1;
 prefs.cfg = Object.assign({}, DEFAULT_CFG, prefs.cfg || {});
 prefs.cfg.cats = prefs.cfg.cats.filter(c => CATS.includes(c));
@@ -551,6 +551,15 @@ function render() {
   else if (S.screen === 'quiz' && S.run.active) v.innerHTML = localBanner() + (S.run.finished ? viewResults() : viewQuiz()) + footer;
   else { S.screen = 'setup'; v.innerHTML = localBanner() + status + viewSetup() + footer; }
   if (S.screen === 'dict' && S.dict.view === 'blitz') runBlitzTimer();
+  if (S.screen === 'dict') {
+    const d = S.dict;
+    if (d.view === 'cards' && d.cards && d.cards.pos < d.cards.deck.length && (prefs.dict.dir === 'tm' || d.cards.flipped))
+      autoSpeak(d.cards.deck[d.cards.pos], `c${d.cards.pos}:${d.cards.deck[d.cards.pos]}`);
+    if (d.view === 'blitz' && d.blitz && !d.blitz.done) {
+      const r = d.blitz.rounds[d.blitz.pos];
+      if (prefs.dict.dir === 'tm' || r.picked !== null) autoSpeak(r.id, `b${d.blitz.pos}:${r.id}`);
+    }
+  }
 }
 
 function viewSetup() {
@@ -867,6 +876,25 @@ function termQueue(n) {
 S.dict = { view: 'list', q: '', cards: null, blitz: null };
 const sideOf = (g, front) => (prefs.dict.dir === 'tm') === front ? g.term : g.meaning;   // tm: term on the front
 
+/* pronunciation of glossary terms (never questions) with the device's Czech voice */
+const tts = window.speechSynthesis || null;
+let czVoice = null;
+function findCzVoice() { czVoice = tts ? tts.getVoices().find(v => /^cs([-_]|$)/i.test(v.lang)) || null : null; return czVoice; }
+if (tts) { findCzVoice(); tts.addEventListener?.('voiceschanged', findCzVoice); }
+function speakTerm(id, quiet) {
+  const g = GMAP[id];
+  if (!g || !tts) { if (!quiet) toast('Этот браузер не умеет озвучивать текст.'); return; }
+  if (!czVoice && !findCzVoice()) { if (!quiet) toast('На этом устройстве нет чешского голоса для озвучки.'); return; }
+  tts.cancel();
+  const u = new SpeechSynthesisUtterance(T(g.term).cs);
+  u.voice = czVoice; u.lang = czVoice.lang; u.rate = 0.9;
+  tts.speak(u);
+}
+const sayBtn = id => `<button type="button" class="say-btn" data-action="dsay" data-id="${id}" aria-label="Озвучить термин" title="Озвучить термин">${ICON.soundOn}</button>`;
+// speak the term once when it first appears, if the viewer turned that on
+let lastSpoken = '';
+function autoSpeak(id, key) { if (prefs.dict.autoSpeak && key !== lastSpoken) { lastSpoken = key; speakTerm(id, true); } }
+
 const BLITZ_SPEEDS = [{ v: 1.5, ru: 'Спокойно' }, { v: 1, ru: 'Обычно' }, { v: 0.7, ru: 'Быстро' }];
 // seconds for one blitz round: a base plus reading time for the prompt and all four options
 function blitzSeconds(round) {
@@ -950,6 +978,11 @@ function viewDict() {
           <div class="chips">${BLITZ_SPEEDS.map(sp => `<button type="button" class="chip" data-action="dspeed" data-val="${sp.v}" aria-pressed="${prefs.dict.speed === sp.v}">${sp.ru}</button>`).join('')}</div>
           <p class="small muted" style="margin:6px 0 0">Время на ответ зависит от длины текста: несколько секунд плюс время на чтение термина и всех вариантов. С включённым переводом времени больше.</p>
         </div>
+        <div>
+          <p class="section-label">Озвучка терминов</p>
+          <div class="chips"><button type="button" class="chip" data-action="dauto" aria-pressed="${prefs.dict.autoSpeak}">Озвучивать автоматически</button></div>
+          <p class="small muted" style="margin:6px 0 0">Термин произносит чешский голос вашего устройства, кнопка ${ICON.soundOn.replace('<svg', '<svg width="14" height="14" style="vertical-align:-2px"')} есть у каждого термина. Вопросы и значения не озвучиваются.</p>
+        </div>
         <div class="row">
           <button type="button" class="btn primary" data-action="dcards">Карточки</button>
           <button type="button" class="btn primary" data-action="dblitz">Блиц на время</button>
@@ -960,7 +993,7 @@ function viewDict() {
       <section class="card stack">
         <input type="search" id="dict-q" class="search" placeholder="Поиск по словарю" value="${esc(d.q)}" autocomplete="off" aria-label="Поиск по словарю">
         ${groups.length ? groups.map(([c, list]) => `<div><p class="chip-group">${esc(c)}</p><dl class="gloss">${list.map(g => `
-          <div class="gl-item ${termKnown(g.id) ? 'is-known' : ''}"><dt>${tx(g.term)}</dt><dd>${tx(g.meaning)}<span class="gl-src">вопрос № ${esc(g.q)}</span></dd></div>`).join('')}</dl></div>`).join('')
+          <div class="gl-item ${termKnown(g.id) ? 'is-known' : ''}"><dt class="say-row">${tx(g.term)}${sayBtn(g.id)}</dt><dd>${tx(g.meaning)}<span class="gl-src">вопрос № ${esc(g.q)}</span></dd></div>`).join('')}</dl></div>`).join('')
           : `<div class="empty">Ничего не найдено.</div>`}
       </section>
     </div>
@@ -990,6 +1023,7 @@ function viewCards() {
       ${c.flipped ? `<span class="fc-back"><span class="fc-side">${prefs.dict.dir === 'tm' ? 'Значение' : 'Термин'}</span>${tx(back)}<span class="gl-src">вопрос № ${esc(g.q)} · ${esc(g.category)}</span></span>`
         : '<span class="fc-hint">Вспомните ответ и нажмите, чтобы перевернуть</span>'}
     </button>
+    ${prefs.dict.dir === 'tm' || c.flipped ? `<div class="say-line">${sayBtn(g.id)}<span>Произнести термин</span></div>` : ''}
     ${c.flipped ? `<div class="answer-bar"><button type="button" class="btn danger" data-action="dcard" data-val="0">Не знал</button><button type="button" class="btn primary" data-action="dcard" data-val="1" style="margin-left:0">Знал</button></div>` : ''}
     <div class="row"><button type="button" class="link-btn small" data-action="dlist">Закончить</button></div>
   </div>`;
@@ -1022,9 +1056,10 @@ function viewBlitz() {
       <span style="margin-left:auto" class="row"><span class="score ok">${ICON.check}${b.ok}</span><span class="score">серия ${b.streak}</span></span></div>
     <div class="timer" aria-hidden="true"><i id="blitz-bar" style="width:${answered ? 0 : 100}%"></i></div>
     <p class="small muted" style="margin:0">${answered ? '' : `Осталось <b id="blitz-left" class="num">${blitzSeconds(r)}</b> с · `}${prefs.dict.dir === 'tm' ? 'выберите значение' : 'выберите термин'}</p>
-    <h2 class="qtext">${tx(sideOf(g, true))}</h2>
+    <h2 class="qtext ${prefs.dict.dir === 'tm' ? 'say-row' : ''}">${tx(sideOf(g, true))}${prefs.dict.dir === 'tm' ? sayBtn(g.id) : ''}</h2>
     <div class="opts">${opts}</div>
     ${verdict}
+    ${answered && prefs.dict.dir === 'mt' ? `<div class="say-line">${sayBtn(g.id)}<span>Произнести правильный термин</span></div>` : ''}
     <div class="row"><button type="button" class="link-btn small" data-action="dlist">Закончить</button></div>
   </div>`;
 }
@@ -1083,6 +1118,8 @@ document.addEventListener('click', e => {
       c.pos++; c.flipped = false; render(); return;
     }
     case 'dpick': blitzAnswer(b.dataset.id); return;
+    case 'dsay': speakTerm(b.dataset.id); return;
+    case 'dauto': prefs.dict.autoSpeak = !prefs.dict.autoSpeak; savePrefs(); render(); if (prefs.dict.autoSpeak) speakTerm(GLOSSARY[0].id); return;
     case 'dnext': blitzNext(); return;
     case 'font': {
       const i = FONT_STEPS.indexOf(prefs.font) + Number(b.dataset.dir);

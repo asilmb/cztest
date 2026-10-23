@@ -238,6 +238,14 @@ main { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-
 .fc-hint { margin-top: auto; font-size: 14px; color: var(--accent); font-weight: 700; }
 .answer-bar .btn.danger { flex: 1; }
 .answer-bar .btn.danger + .btn { flex: 1; }
+.say-row { display: flex; align-items: flex-start; gap: 8px; }
+.say-row > .t { flex: 1; min-width: 0; }
+.say-btn { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--accent);
+  display: inline-grid; place-items: center; padding: 0; }
+.say-btn:hover { border-color: var(--accent); }
+.say-btn svg { width: 18px; height: 18px; }
+.gl-item .say-btn { width: 32px; height: 32px; margin-top: -4px; }
+.say-line { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); }
 .timer { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .timer i { display: block; height: 100%; background: var(--warn); border-radius: 4px; transition: width .1s linear; }
 .qtext.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
