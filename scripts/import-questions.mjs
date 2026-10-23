@@ -17,7 +17,20 @@ const src = read('questions.json');
 const topics = read('topics.json');
 const assign = read('assign.json');
 // the export lost paragraph breaks ("…4+1.Kupní cena…"); put them back so the case reads in paragraphs
-const paragraphs = text => text.replace(/([.!?:])(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽА-ЯЁ])/g, '$1\n').trim();
+// and lettered lists ("…40 000 Kčb) bezúročné…"): each of a), b), c)… in sequence starts a new line
+const listItems = text => {
+  let out = text, from = 0;
+  for (const letter of 'abcdefghij') {
+    const rest = out.slice(from), hit = rest.search(new RegExp(`${letter}\\)`));
+    if (hit < 0) break;
+    const at = from + hit;
+    if (letter === 'a' && !out.slice(at).includes('b)')) break;
+    if (at > 0 && out[at - 1] !== '\n') out = out.slice(0, at).replace(/[ \t]+$/, '') + '\n' + out.slice(at);
+    from = out.indexOf(`${letter})`, from) + 2;
+  }
+  return out;
+};
+const paragraphs = text => listItems(text.replace(/([.!?:])(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽА-ЯЁ])/g, '$1\n')).trim();
 const cases = Object.fromEntries(read('cases.json').map(c => [String(c.id), paragraphs(c.text)]));
 const ru = existsSync(join(root, 'questions', 'source', 'ru.json')) ? read('ru.json') : { questions: {}, cases: {} };
 const both = (cs, tr) => (tr ? { cs, ru: tr } : cs);   // a plain string when there is no translation
