@@ -3,6 +3,8 @@
 
 /* ---------- question bank (inlined by build.mjs from questions/questions.json) ---------- */
 const QUESTIONS = /*@QUESTIONS*/[];
+// glossary built by scripts/import-questions.mjs: each meaning is quoted from the exam questions and answers
+const GLOSSARY = /*@GLOSSARY*/[];
 
 // stamped by build.mjs: version from package.json, build time, and a fingerprint of the question bank
 const BUILD = /*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev', bankCompat: [] };
@@ -87,6 +89,7 @@ const emptyProgress = () => ({ v: 1, q: {}, history: [], bank: { id: BUILD.bank,
 const emptyRun = () => ({ active: false, updatedAt: 0 });
 const DEFAULT_CFG = { cats: [], kinds: [], mode: 'snowball', hard: false, count: 20, caseCount: 3 };
 const prefs = Object.assign({ sound: true, ru: false, font: 1 }, lsGet('cztest:prefs') || {});
+prefs.dict = Object.assign({ dir: 'tm', speed: 1, count: 20 }, prefs.dict || {});
 if (!FONT_STEPS.includes(prefs.font)) prefs.font = 1;
 prefs.cfg = Object.assign({}, DEFAULT_CFG, prefs.cfg || {});
 prefs.cfg.cats = prefs.cfg.cats.filter(c => CATS.includes(c));
@@ -339,7 +342,7 @@ function onRemoteChange(key, first) {
     if (first && S.run.active && !S.run.finished) S.screen = 'quiz';
     const sig = runSig();
     if (sig !== S.lastRunSig || first) { S.lastRunSig = sig; S.sel = S.run.sel || []; if (S.screen !== 'stats') render(); }
-  } else if (S.screen !== 'quiz' || first) render();
+  } else if ((S.screen !== 'quiz' && !(S.screen === 'dict' && S.dict.view !== 'list')) || first) render();
   renderChrome();
 }
 const runSig = () => { const r = S.run; return r.active ? `${r.id}:${r.pos}:${r.order.length}:${(r.log || []).filter(Boolean).length}:${r.finished}` : 'none'; };
@@ -499,9 +502,8 @@ function renderChrome() {
   sb.innerHTML = prefs.sound ? ICON.soundOn : ICON.soundOff;
   sb.title = prefs.sound ? 'Звуки включены' : 'Звуки выключены';
   $('#brand-sub').textContent = `${nQ(QS.length)} · ${CATS.length} ${plural(CATS.length, 'категория', 'категории', 'категорий')}`;
-  const onQuiz = S.screen !== 'stats';
-  $('#tab-setup').setAttribute('aria-current', onQuiz ? 'page' : 'false');
-  $('#tab-stats').setAttribute('aria-current', onQuiz ? 'false' : 'page');
+  const tab = S.screen === 'stats' || S.screen === 'dict' ? S.screen : 'setup';
+  for (const t of ['setup', 'dict', 'stats']) $('#tab-' + t).setAttribute('aria-current', tab === t ? 'page' : 'false');
   const pill = $('#store-pill');
   const labels = {
     connecting: ['Подключение…', 'Загружаю общий прогресс'],
@@ -543,9 +545,12 @@ function render() {
   const status = `<p class="store-line" data-mode="${store.mode}">${esc($('#store-pill').textContent)}</p>`;
   const built = BUILD.builtAt ? new Date(BUILD.builtAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
   const footer = `<footer class="build">Версия ${esc(BUILD.version)}${built ? ` · сборка ${built}` : ''}</footer>`;
-  if (S.screen === 'stats') v.innerHTML = localBanner() + status + viewStats() + footer;
+  if (S.screen !== 'dict' || S.dict.view !== 'blitz') stopBlitzTimer();
+  if (S.screen === 'dict') v.innerHTML = localBanner() + viewDict() + footer;
+  else if (S.screen === 'stats') v.innerHTML = localBanner() + status + viewStats() + footer;
   else if (S.screen === 'quiz' && S.run.active) v.innerHTML = localBanner() + (S.run.finished ? viewResults() : viewQuiz()) + footer;
   else { S.screen = 'setup'; v.innerHTML = localBanner() + status + viewSetup() + footer; }
+  if (S.screen === 'dict' && S.dict.view === 'blitz') runBlitzTimer();
 }
 
 function viewSetup() {
@@ -841,6 +846,189 @@ function viewStats() {
   </div>`;
 }
 
+/* ---------- dictionary: list, flashcards, blitz ----------
+   Terms come only from GLOSSARY (quoted from the exam). Per-term results live in progress.g, in the same
+   shape as question stats, so the shared progress keeps them too. */
+const GMAP = Object.fromEntries(GLOSSARY.map(g => [g.id, g]));
+const gst = id => (S.progress.g || {})[id];
+function recordTerm(id, ok) {
+  const g = S.progress.g || (S.progress.g = {});
+  const s = g[id] || (g[id] = { s: 0, r: 0, w: 0, k: 0, t: 0 });
+  s.s++; s.t = Date.now();
+  if (ok) { s.r++; s.k++; } else { s.w++; s.k = 0; }
+  store.save('progress');
+}
+const termKnown = id => (gst(id)?.k || 0) >= MASTERED_STREAK;
+// least known first: never answered or last answered wrong, then the longest unseen
+function termQueue(n) {
+  const rank = id => { const s = gst(id); return !s ? 0 : s.k === 0 ? 1 : s.k < MASTERED_STREAK ? 2 : 3; };
+  return shuffle(GLOSSARY.map(g => g.id)).sort((a, b) => rank(a) - rank(b) || (gst(a)?.t || 0) - (gst(b)?.t || 0)).slice(0, n);
+}
+S.dict = { view: 'list', q: '', cards: null, blitz: null };
+const sideOf = (g, front) => (prefs.dict.dir === 'tm') === front ? g.term : g.meaning;   // tm: term on the front
+
+const BLITZ_SPEEDS = [{ v: 1.5, ru: 'Спокойно' }, { v: 1, ru: 'Обычно' }, { v: 0.7, ru: 'Быстро' }];
+// seconds for one blitz round: a base plus reading time for the prompt and all four options
+function blitzSeconds(round) {
+  const g = GMAP[round.id];
+  const chars = T(sideOf(g, true)).cs.length + round.options.reduce((a, id) => a + T(sideOf(GMAP[id], false)).cs.length, 0);
+  const sec = (4 + chars / 15) * prefs.dict.speed * (prefs.ru ? 1.3 : 1);
+  return Math.round(clamp(sec, 5, 75));
+}
+function blitzOptions(id) {
+  const g = GMAP[id];
+  const others = shuffle(GLOSSARY.filter(x => x.id !== id));
+  const same = others.filter(x => x.category === g.category);
+  const picks = [...same, ...others.filter(x => x.category !== g.category)].slice(0, 3).map(x => x.id);
+  return shuffle([id, ...picks]);
+}
+function startCards() {
+  S.dict.cards = { deck: termQueue(prefs.dict.count), pos: 0, flipped: false, known: 0, unknown: 0, missed: [] };
+  S.dict.view = 'cards'; render(); window.scrollTo(0, 0);
+}
+function startBlitz() {
+  const ids = termQueue(Math.min(prefs.dict.count, GLOSSARY.length));
+  S.dict.blitz = { rounds: ids.map(id => ({ id, options: blitzOptions(id), picked: null })), pos: 0, ok: 0, streak: 0, best: 0, done: false };
+  S.dict.view = 'blitz'; render(); window.scrollTo(0, 0);
+}
+let blitzTimer = null;
+function stopBlitzTimer() { clearInterval(blitzTimer); blitzTimer = null; }
+function runBlitzTimer() {
+  stopBlitzTimer();
+  const b = S.dict.blitz; if (!b || b.done) return;
+  const round = b.rounds[b.pos]; if (round.picked !== null) return;
+  if (!round.deadline) { round.total = blitzSeconds(round) * 1000; round.deadline = Date.now() + round.total; }
+  const tick = () => {
+    const left = round.deadline - Date.now();
+    const bar = $('#blitz-bar'), num = $('#blitz-left');
+    if (bar) bar.style.width = Math.max(0, left / round.total * 100) + '%';
+    if (num) num.textContent = Math.max(0, Math.ceil(left / 1000));
+    if (left <= 0) blitzAnswer(-1);
+  };
+  tick(); blitzTimer = setInterval(tick, 100);
+}
+function blitzAnswer(optId) {
+  const b = S.dict.blitz, round = b.rounds[b.pos];
+  if (round.picked !== null) return;
+  stopBlitzTimer();
+  round.picked = optId;   // -1: time ran out
+  const ok = optId === round.id;
+  if (ok) { b.ok++; b.streak++; b.best = Math.max(b.best, b.streak); } else b.streak = 0;
+  playSound(ok); recordTerm(round.id, ok); render();
+}
+function blitzNext() {
+  const b = S.dict.blitz;
+  if (b.pos + 1 >= b.rounds.length) b.done = true; else b.pos++;
+  render(); window.scrollTo(0, 0);
+}
+
+function viewDict() {
+  const d = S.dict;
+  if (!GLOSSARY.length) return `<div class="empty">Словарь пока пуст.</div>`;
+  if (d.view === 'cards' && d.cards) return viewCards();
+  if (d.view === 'blitz' && d.blitz) return viewBlitz();
+  const known = GLOSSARY.filter(g => termKnown(g.id)).length;
+  const q = d.q.trim().toLowerCase();
+  const match = g => !q || [g.term.cs, g.term.ru, g.meaning.cs, g.meaning.ru].some(t => (t || '').toLowerCase().includes(q));
+  const groups = CATS.map(c => [c, GLOSSARY.filter(g => g.category === c && match(g))]).filter(([, list]) => list.length);
+  const dirSeg = `<div class="seg" role="radiogroup" aria-label="Направление">
+      <button type="button" role="radio" data-action="ddir" data-val="tm" aria-checked="${prefs.dict.dir === 'tm'}">Термин → значение</button>
+      <button type="button" role="radio" data-action="ddir" data-val="mt" aria-checked="${prefs.dict.dir === 'mt'}">Значение → термин</button></div>`;
+  return `
+  <div class="grid-2">
+    <div class="stack">
+      <section class="card stack">
+        <div class="hero-num"><span class="big">${known}<span style="font-size:.45em"> / ${GLOSSARY.length}</span></span><span>терминов выучено</span></div>
+        <p class="small muted" style="margin:0">Все термины и значения взяты из вопросов экзамена: значение — это правильный ответ (или текст вопроса), номер вопроса указан у каждого термина. Термин считается выученным после ${MASTERED_STREAK} верных ответов подряд в карточках или блице.</p>
+        <div><p class="section-label">Направление</p>${dirSeg}</div>
+        <div>
+          <p class="section-label">Сколько терминов за раз</p>
+          <div class="chips">${[10, 20, 40, GLOSSARY.length].map(n => `<button type="button" class="chip" data-action="dcount" data-val="${n}" aria-pressed="${prefs.dict.count === n}">${n === GLOSSARY.length ? 'Все ' + n : n}</button>`).join('')}</div>
+        </div>
+        <div>
+          <p class="section-label">Темп блица</p>
+          <div class="chips">${BLITZ_SPEEDS.map(sp => `<button type="button" class="chip" data-action="dspeed" data-val="${sp.v}" aria-pressed="${prefs.dict.speed === sp.v}">${sp.ru}</button>`).join('')}</div>
+          <p class="small muted" style="margin:6px 0 0">Время на ответ зависит от длины текста: несколько секунд плюс время на чтение термина и всех вариантов. С включённым переводом времени больше.</p>
+        </div>
+        <div class="row">
+          <button type="button" class="btn primary" data-action="dcards">Карточки</button>
+          <button type="button" class="btn primary" data-action="dblitz">Блиц на время</button>
+        </div>
+      </section>
+    </div>
+    <div class="stack">
+      <section class="card stack">
+        <input type="search" id="dict-q" class="search" placeholder="Поиск по словарю" value="${esc(d.q)}" autocomplete="off" aria-label="Поиск по словарю">
+        ${groups.length ? groups.map(([c, list]) => `<div><p class="chip-group">${esc(c)}</p><dl class="gloss">${list.map(g => `
+          <div class="gl-item ${termKnown(g.id) ? 'is-known' : ''}"><dt>${tx(g.term)}</dt><dd>${tx(g.meaning)}<span class="gl-src">вопрос № ${esc(g.q)}</span></dd></div>`).join('')}</dl></div>`).join('')
+          : `<div class="empty">Ничего не найдено.</div>`}
+      </section>
+    </div>
+  </div>`;
+}
+
+function viewCards() {
+  const c = S.dict.cards;
+  if (c.pos >= c.deck.length) {
+    const missed = [...new Set(c.missed)].map(id => GMAP[id]);
+    return `<div class="quiz"><section class="card stack">
+      <p class="section-label">Карточки пройдены</p>
+      <div class="result-hero"><span class="big">${c.known}<span style="font-size:.5em"> / ${c.known + c.unknown}</span></span><div>ответов «знал»</div></div>
+      ${missed.length ? `<div><p class="section-label">Не знали</p><dl class="gloss">${missed.map(g => `<div class="gl-item"><dt>${tx(g.term)}</dt><dd>${tx(g.meaning)}</dd></div>`).join('')}</dl></div>` : '<p>Все карточки знали.</p>'}
+      <div class="row"><button type="button" class="btn" data-action="dlist">К словарю</button><button type="button" class="btn primary" data-action="dcards">Ещё раз</button></div>
+    </section></div>`;
+  }
+  const g = GMAP[c.deck[c.pos]];
+  const front = sideOf(g, true), back = sideOf(g, false);
+  return `<div class="quiz">
+    <div class="qhead"><span class="pos">${c.pos + 1} / ${c.deck.length}</span><span class="qmode">Карточки · ${prefs.dict.dir === 'tm' ? 'термин → значение' : 'значение → термин'}</span>
+      <span style="margin-left:auto" class="row"><span class="score ok">${ICON.check}${c.known}</span><span class="score bad">${ICON.cross}${c.unknown}</span></span></div>
+    <div class="pbar" aria-hidden="true"><i style="width:${pct(c.pos, c.deck.length)}%"></i></div>
+    <button type="button" class="flashcard ${c.flipped ? 'flipped' : ''}" data-action="dflip" aria-label="${c.flipped ? 'Карточка открыта' : 'Перевернуть карточку'}">
+      <span class="fc-side">${prefs.dict.dir === 'tm' ? 'Термин' : 'Значение'}</span>
+      <span class="fc-front">${tx(front)}</span>
+      ${c.flipped ? `<span class="fc-back"><span class="fc-side">${prefs.dict.dir === 'tm' ? 'Значение' : 'Термин'}</span>${tx(back)}<span class="gl-src">вопрос № ${esc(g.q)} · ${esc(g.category)}</span></span>`
+        : '<span class="fc-hint">Вспомните ответ и нажмите, чтобы перевернуть</span>'}
+    </button>
+    ${c.flipped ? `<div class="answer-bar"><button type="button" class="btn danger" data-action="dcard" data-val="0">Не знал</button><button type="button" class="btn primary" data-action="dcard" data-val="1" style="margin-left:0">Знал</button></div>` : ''}
+    <div class="row"><button type="button" class="link-btn small" data-action="dlist">Закончить</button></div>
+  </div>`;
+}
+
+function viewBlitz() {
+  const b = S.dict.blitz;
+  if (b.done) {
+    const missed = b.rounds.filter(r => r.picked !== r.id).map(r => GMAP[r.id]);
+    return `<div class="quiz"><section class="card stack">
+      <p class="section-label">Блиц окончен</p>
+      <div class="result-hero"><span class="big">${b.ok}<span style="font-size:.5em"> / ${b.rounds.length}</span></span><div>верных ответов<p class="small muted" style="margin:4px 0 0">Лучшая серия: ${b.best}</p></div></div>
+      ${missed.length ? `<div><p class="section-label">Ошибки и пропуски</p><dl class="gloss">${missed.map(g => `<div class="gl-item"><dt>${tx(g.term)}</dt><dd>${tx(g.meaning)}</dd></div>`).join('')}</dl></div>` : '<p>Без единой ошибки.</p>'}
+      <div class="row"><button type="button" class="btn" data-action="dlist">К словарю</button><button type="button" class="btn primary" data-action="dblitz">Ещё блиц</button></div>
+    </section></div>`;
+  }
+  const r = b.rounds[b.pos], g = GMAP[r.id], answered = r.picked !== null;
+  const opts = r.options.map((id, i) => {
+    const o = GMAP[id];
+    let cls = '';
+    if (answered) cls = id === r.id ? 'is-ok' : id === r.picked ? 'is-bad' : 'is-dim';
+    return `<button type="button" class="opt ${cls}" data-action="dpick" data-id="${id}" ${answered ? 'disabled' : ''}>
+      <span class="mk round">${answered && id === r.id ? ICON.check : answered && id === r.picked ? ICON.cross : i + 1}</span><span>${tx(sideOf(o, false))}</span></button>`;
+  }).join('');
+  const verdict = !answered ? '' : `<div class="answer-bar ${r.picked === r.id ? 'ok' : 'bad'}">
+      <span class="verdict"><span class="vi">${r.picked === r.id ? ICON.check : ICON.cross}</span><span><strong>${r.picked === r.id ? 'Верно!' : r.picked === -1 ? 'Время вышло' : 'Неверно'}</strong><small>вопрос № ${esc(g.q)}</small></span></span>
+      <button type="button" class="btn primary" data-action="dnext">${b.pos + 1 >= b.rounds.length ? 'Итог' : 'Дальше'}</button></div>`;
+  return `<div class="quiz">
+    <div class="qhead"><span class="pos">${b.pos + 1} / ${b.rounds.length}</span><span class="qmode">Блиц · ${BLITZ_SPEEDS.find(sp => sp.v === prefs.dict.speed)?.ru.toLowerCase() || ''}</span>
+      <span style="margin-left:auto" class="row"><span class="score ok">${ICON.check}${b.ok}</span><span class="score">серия ${b.streak}</span></span></div>
+    <div class="timer" aria-hidden="true"><i id="blitz-bar" style="width:${answered ? 0 : 100}%"></i></div>
+    <p class="small muted" style="margin:0">${answered ? '' : `Осталось <b id="blitz-left" class="num">${blitzSeconds(r)}</b> с · `}${prefs.dict.dir === 'tm' ? 'выберите значение' : 'выберите термин'}</p>
+    <h2 class="qtext">${tx(sideOf(g, true))}</h2>
+    <div class="opts">${opts}</div>
+    ${verdict}
+    <div class="row"><button type="button" class="link-btn small" data-action="dlist">Закончить</button></div>
+  </div>`;
+}
+
 /* ---------- toast ---------- */
 let toastTimer;
 function toast(msg) {
@@ -857,7 +1045,7 @@ document.addEventListener('click', e => {
   const a = b.dataset.action, cfg = prefs.cfg;
   switch (a) {
     case 'nav':
-      S.screen = b.dataset.screen === 'stats' ? 'stats' : (S.run.active ? 'quiz' : 'setup');
+      S.screen = b.dataset.screen === 'stats' ? 'stats' : b.dataset.screen === 'dict' ? 'dict' : (S.run.active ? 'quiz' : 'setup');
       if (b.dataset.screen === 'setup' && S.run.active && S.run.finished) S.screen = 'quiz';
       S.confirm = null; render(); window.scrollTo(0, 0); return;
     case 'cat': {
@@ -881,6 +1069,21 @@ document.addEventListener('click', e => {
       startRun(); return;
     case 'start-force': startRun(); return;
     case 'hint': S.hintOpen = !S.hintOpen; render(); return;
+    case 'ddir': prefs.dict.dir = b.dataset.val === 'mt' ? 'mt' : 'tm'; savePrefs(); render(); return;
+    case 'dcount': prefs.dict.count = Number(b.dataset.val); savePrefs(); render(); return;
+    case 'dspeed': prefs.dict.speed = Number(b.dataset.val); savePrefs(); render(); return;
+    case 'dcards': startCards(); return;
+    case 'dblitz': startBlitz(); return;
+    case 'dlist': S.dict.view = 'list'; render(); window.scrollTo(0, 0); return;
+    case 'dflip': if (!S.dict.cards.flipped) { S.dict.cards.flipped = true; render(); } return;
+    case 'dcard': {
+      const c = S.dict.cards, id = c.deck[c.pos], ok = b.dataset.val === '1';
+      recordTerm(id, ok);
+      if (ok) c.known++; else { c.unknown++; c.missed.push(id); if (c.deck.indexOf(id, c.pos + 1) < 0) c.deck.splice(Math.min(c.pos + 4, c.deck.length), 0, id); }
+      c.pos++; c.flipped = false; render(); return;
+    }
+    case 'dpick': blitzAnswer(b.dataset.id); return;
+    case 'dnext': blitzNext(); return;
     case 'font': {
       const i = FONT_STEPS.indexOf(prefs.font) + Number(b.dataset.dir);
       prefs.font = FONT_STEPS[clamp(i, 0, FONT_STEPS.length - 1)];
@@ -941,6 +1144,10 @@ function toggleOpt(i) {
 document.addEventListener('input', e => {
   if (e.target.id === 'count') {
     prefs.cfg[prefs.cfg.mode === 'cases' ? 'caseCount' : 'count'] = +e.target.value; $('#count-val').textContent = e.target.value; savePrefs();
+  } else if (e.target.id === 'dict-q') {
+    S.dict.q = e.target.value;
+    const pos = e.target.selectionStart; render();
+    const inp = $('#dict-q'); if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
   } else if (e.target.id === 'reset-input') {
     S.resetText = e.target.value;
     $('#reset-go').disabled = S.resetText.trim().toUpperCase() !== 'УДАЛИТЬ';
@@ -948,6 +1155,17 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (S.screen === 'dict' && !e.target.matches('input, textarea') && !(e.metaKey || e.ctrlKey || e.altKey)) {
+    const d = S.dict;
+    if (d.view === 'blitz' && d.blitz && !d.blitz.done) {
+      const r = d.blitz.rounds[d.blitz.pos], n = parseInt(e.key, 10);
+      if (r.picked === null && n >= 1 && n <= r.options.length) { blitzAnswer(r.options[n - 1]); e.preventDefault(); }
+      else if (r.picked !== null && e.key === 'Enter' && !e.target.closest('button')) { blitzNext(); e.preventDefault(); }
+    } else if (d.view === 'cards' && d.cards && d.cards.pos < d.cards.deck.length && !e.target.closest('button')) {
+      if (e.key === ' ' && !d.cards.flipped) { d.cards.flipped = true; render(); e.preventDefault(); }
+    }
+    return;
+  }
   if (S.screen !== 'quiz' || !S.run.active || S.run.finished || e.target.matches('input, textarea')) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const q = currentQ(); if (!q) return;

@@ -1,0 +1,654 @@
+[
+ {
+  "id": "420",
+  "source": "answer",
+  "term": {
+   "cs": "Diskontovaný dluhopis",
+   "ru": "Дисконтная облигация"
+  }
+ },
+ {
+  "id": "422",
+  "source": "answer",
+  "term": {
+   "cs": "Hypoteční zástavní listy",
+   "ru": "Ипотечные закладные листы"
+  }
+ },
+ {
+  "id": "439",
+  "source": "answer",
+  "term": {
+   "cs": "Maržové obchodování (margin trading)",
+   "ru": "Маржинальная торговля (margin trading)"
+  }
+ },
+ {
+  "id": "440",
+  "source": "answer",
+  "term": {
+   "cs": "Alokační efektivnost finančního trhu",
+   "ru": "Аллокационная эффективность финансового рынка"
+  }
+ },
+ {
+  "id": "720",
+  "source": "answer",
+  "term": {
+   "cs": "Dluhopis",
+   "ru": "Облигация"
+  }
+ },
+ {
+  "id": "717",
+  "source": "answer",
+  "term": {
+   "cs": "Kontokorent",
+   "ru": "Овердрафт (kontokorent)"
+  }
+ },
+ {
+  "id": "42",
+  "source": "answer",
+  "term": {
+   "cs": "Konsolidace půjček",
+   "ru": "Консолидация займов"
+  }
+ },
+ {
+  "id": "50",
+  "source": "answer",
+  "term": {
+   "cs": "Povolené přečerpání",
+   "ru": "Разрешённый овердрафт"
+  }
+ },
+ {
+  "id": "61",
+  "source": "answer",
+  "term": {
+   "cs": "Spotřebitelský úvěr",
+   "ru": "Потребительский кредит"
+  }
+ },
+ {
+  "id": "114",
+  "source": "answer",
+  "term": {
+   "cs": "Spotřebitel",
+   "ru": "Потребитель"
+  }
+ },
+ {
+  "id": "192",
+  "source": "answer",
+  "term": {
+   "cs": "Úvěrovaný",
+   "ru": "Получатель кредита (úvěrovaný)"
+  }
+ },
+ {
+  "id": "228",
+  "source": "answer",
+  "term": {
+   "cs": "Úvěr",
+   "ru": "Кредит"
+  }
+ },
+ {
+  "id": "233",
+  "source": "answer",
+  "term": {
+   "cs": "Úvěrový účet",
+   "ru": "Кредитный счёт"
+  }
+ },
+ {
+  "id": "363",
+  "source": "answer",
+  "term": {
+   "cs": "Věřitel v úvěrové smlouvě",
+   "ru": "Кредитор в кредитном договоре"
+  }
+ },
+ {
+  "id": "18",
+  "source": "answer",
+  "term": {
+   "cs": "Refixace",
+   "ru": "Рефиксация"
+  }
+ },
+ {
+  "id": "95",
+  "source": "answer",
+  "term": {
+   "cs": "Hypoteční úvěr",
+   "ru": "Ипотечный кредит"
+  }
+ },
+ {
+  "id": "158",
+  "source": "answer",
+  "term": {
+   "cs": "Americká hypotéka",
+   "ru": "Американская ипотека"
+  }
+ },
+ {
+  "id": "393",
+  "source": "answer",
+  "term": {
+   "cs": "Refinancování úvěru",
+   "ru": "Рефинансирование кредита"
+  }
+ },
+ {
+  "id": "189",
+  "source": "answer",
+  "term": {
+   "cs": "Tranše",
+   "ru": "Транш"
+  }
+ },
+ {
+  "id": "190",
+  "source": "answer",
+  "term": {
+   "cs": "Fixace",
+   "ru": "Фиксация"
+  }
+ },
+ {
+  "id": "224",
+  "source": "answer",
+  "term": {
+   "cs": "Domicilace",
+   "ru": "Домицилация"
+  }
+ },
+ {
+  "id": "225",
+  "source": "answer",
+  "term": {
+   "cs": "Negative pledge",
+   "ru": "Negative pledge"
+  }
+ },
+ {
+  "id": "226",
+  "source": "answer",
+  "term": {
+   "cs": "Předhypoteční úvěr",
+   "ru": "Предипотечный кредит"
+  }
+ },
+ {
+  "id": "591",
+  "source": "answer",
+  "term": {
+   "cs": "Spotřebitelský úvěr na bydlení",
+   "ru": "Потребительский кредит на жильё"
+  }
+ },
+ {
+  "id": "721",
+  "source": "answer",
+  "term": {
+   "cs": "Překlenovací úvěr",
+   "ru": "Промежуточный кредит"
+  }
+ },
+ {
+  "id": "22",
+  "source": "answer",
+  "term": {
+   "cs": "Složené úročení",
+   "ru": "Сложное начисление процентов"
+  }
+ },
+ {
+  "id": "164",
+  "source": "answer",
+  "term": {
+   "cs": "Jednoduché úročení",
+   "ru": "Простое начисление процентов"
+  }
+ },
+ {
+  "id": "199",
+  "source": "answer",
+  "term": {
+   "cs": "Fixní úroková sazba",
+   "ru": "Фиксированная процентная ставка"
+  }
+ },
+ {
+  "id": "240",
+  "source": "answer",
+  "term": {
+   "cs": "Splátkový kalendář",
+   "ru": "График платежей"
+  }
+ },
+ {
+  "id": "394",
+  "source": "answer",
+  "term": {
+   "cs": "Referenční úroková sazba",
+   "ru": "Референтная процентная ставка"
+  }
+ },
+ {
+  "id": "376",
+  "source": "answer",
+  "term": {
+   "cs": "Úrok",
+   "ru": "Проценты"
+  }
+ },
+ {
+  "id": "498",
+  "source": "answer",
+  "term": {
+   "cs": "Časová hodnota peněz",
+   "ru": "Временная стоимость денег"
+  }
+ },
+ {
+  "id": "499",
+  "source": "answer",
+  "term": {
+   "cs": "Úroková míra",
+   "ru": "Процентная ставка"
+  }
+ },
+ {
+  "id": "701",
+  "source": "answer",
+  "term": {
+   "cs": "Anuita",
+   "ru": "Аннуитет"
+  }
+ },
+ {
+  "id": "702",
+  "source": "answer",
+  "term": {
+   "cs": "Úmor",
+   "ru": "Погашение основного долга (úmor)"
+  }
+ },
+ {
+  "id": "716",
+  "source": "answer",
+  "term": {
+   "cs": "Inflace",
+   "ru": "Инфляция"
+  }
+ },
+ {
+  "id": "719",
+  "source": "answer",
+  "term": {
+   "cs": "PRIBOR",
+   "ru": "PRIBOR"
+  }
+ },
+ {
+  "id": "1087",
+  "source": "answer",
+  "term": {
+   "cs": "Degresivní splácení",
+   "ru": "Дегрессивное погашение"
+  }
+ },
+ {
+  "id": "402",
+  "source": "answer",
+  "term": {
+   "cs": "Odborná způsobilost",
+   "ru": "Профессиональная квалификация"
+  }
+ },
+ {
+  "id": "564",
+  "source": "answer",
+  "term": {
+   "cs": "Nebankovní poskytovatel spotřebitelského úvěru",
+   "ru": "Небанковский кредитор потребительских кредитов"
+  }
+ },
+ {
+  "id": "753",
+  "source": "answer",
+  "term": {
+   "cs": "Předsmluvní informace",
+   "ru": "Преддоговорная информация"
+  }
+ },
+ {
+  "id": "581",
+  "source": "answer",
+  "term": {
+   "cs": "Celkové náklady spotřebitelského úvěru",
+   "ru": "Общая стоимость потребительского кредита"
+  }
+ },
+ {
+  "id": "611",
+  "source": "answer",
+  "term": {
+   "cs": "RPSN",
+   "ru": "RPSN"
+  }
+ },
+ {
+  "id": "750",
+  "source": "answer",
+  "term": {
+   "cs": "Roční procentní sazba nákladů spotřebitelského úvěru",
+   "ru": "Годовая процентная ставка затрат по потребительскому кредиту"
+  }
+ },
+ {
+  "id": "242",
+  "source": "answer",
+  "term": {
+   "cs": "Bonita klienta",
+   "ru": "Кредитоспособность клиента (bonita)"
+  }
+ },
+ {
+  "id": "348",
+  "source": "answer",
+  "term": {
+   "cs": "Scoring",
+   "ru": "Скоринг"
+  }
+ },
+ {
+  "id": "467",
+  "source": "answer",
+  "term": {
+   "cs": "Registr dlužníků",
+   "ru": "Реестр должников"
+  }
+ },
+ {
+  "id": "490",
+  "source": "answer",
+  "term": {
+   "cs": "Bankovní registr klientských informací (BRKI)",
+   "ru": "Банковский регистр клиентской информации (BRKI)"
+  }
+ },
+ {
+  "id": "713",
+  "source": "answer",
+  "term": {
+   "cs": "Úvěrový registr",
+   "ru": "Кредитный реестр"
+  }
+ },
+ {
+  "id": "726",
+  "source": "answer",
+  "term": {
+   "cs": "Posouzení úvěruschopnosti spotřebitele",
+   "ru": "Оценка кредитоспособности потребителя"
+  }
+ },
+ {
+  "id": "1111",
+  "source": "answer",
+  "term": {
+   "cs": "Úvěr v defaultu",
+   "ru": "Кредит в дефолте"
+  }
+ },
+ {
+  "id": "1754",
+  "source": "answer",
+  "term": {
+   "cs": "Úrokový rozdíl",
+   "ru": "Процентная разница"
+  }
+ },
+ {
+  "id": "13",
+  "source": "answer",
+  "term": {
+   "cs": "Cena obvyklá",
+   "ru": "Обычная цена (cena obvyklá)"
+  }
+ },
+ {
+  "id": "108",
+  "source": "answer",
+  "term": {
+   "cs": "Plomba na listu vlastnictví",
+   "ru": "Пломба (plomba) в выписке о праве собственности"
+  }
+ },
+ {
+  "id": "229",
+  "source": "answer",
+  "term": {
+   "cs": "Ručitel",
+   "ru": "Поручитель"
+  }
+ },
+ {
+  "id": "356",
+  "source": "answer",
+  "term": {
+   "cs": "Dozajištění spotřebitelského úvěru na bydlení",
+   "ru": "Дополнительное обеспечение потребительского кредита на жильё"
+  }
+ },
+ {
+  "id": "358",
+  "source": "answer",
+  "term": {
+   "cs": "Budoucí zástavní hodnota nemovitosti",
+   "ru": "Будущая залоговая стоимость недвижимости"
+  }
+ },
+ {
+  "id": "714",
+  "source": "answer",
+  "term": {
+   "cs": "List vlastnictví",
+   "ru": "Выписка о праве собственности (list vlastnictví)"
+  }
+ },
+ {
+  "id": "479",
+  "source": "answer",
+  "term": {
+   "cs": "Kolaudační řízení",
+   "ru": "Приёмка здания в эксплуатацию (kolaudační řízení)"
+  }
+ },
+ {
+  "id": "543",
+  "source": "answer",
+  "term": {
+   "cs": "Katastr nemovitostí",
+   "ru": "Кадастр недвижимости"
+  }
+ },
+ {
+  "id": "1081",
+  "source": "answer",
+  "term": {
+   "cs": "Služebnost",
+   "ru": "Сервитут (služebnost)"
+  }
+ },
+ {
+  "id": "1113",
+  "source": "answer",
+  "term": {
+   "cs": "Prohlášení vlastníka budovy",
+   "ru": "Декларация собственника здания"
+  }
+ },
+ {
+  "id": "40",
+  "source": "answer",
+  "term": {
+   "cs": "Karenční doba",
+   "ru": "Период ожидания (karenční doba)"
+  }
+ },
+ {
+  "id": "90",
+  "source": "answer",
+  "term": {
+   "cs": "Pojistná hodnota",
+   "ru": "Страховая стоимость"
+  }
+ },
+ {
+  "id": "154",
+  "source": "answer",
+  "term": {
+   "cs": "Pojistitel",
+   "ru": "Страховщик"
+  }
+ },
+ {
+  "id": "292",
+  "source": "answer",
+  "term": {
+   "cs": "Pojištěný",
+   "ru": "Застрахованный"
+  }
+ },
+ {
+  "id": "451",
+  "source": "answer",
+  "term": {
+   "cs": "Vinkulace",
+   "ru": "Винкуляция (vinkulace)"
+  }
+ },
+ {
+  "id": "24",
+  "source": "answer",
+  "term": {
+   "cs": "Soudní exekutor",
+   "ru": "Судебный исполнитель (exekutor)"
+  }
+ },
+ {
+  "id": "466",
+  "source": "answer",
+  "term": {
+   "cs": "ISIR",
+   "ru": "ISIR"
+  }
+ },
+ {
+  "id": "1014",
+  "source": "answer",
+  "term": {
+   "cs": "Oddlužení",
+   "ru": "Освобождение от долгов (oddlužení)"
+  }
+ },
+ {
+  "id": "1225",
+  "source": "answer",
+  "term": {
+   "cs": "Fikce doručení",
+   "ru": "Фикция вручения"
+  }
+ },
+ {
+  "id": "103",
+  "source": "question",
+  "term": {
+   "cs": "Zprostředkovatel",
+   "ru": "Посредник"
+  },
+  "meaning": {
+   "cs": "Ten, kdo v rámci svého podnikání zprostředkovává spotřebitelský úvěr",
+   "ru": "Тот, кто в рамках своей предпринимательской деятельности осуществляет посредничество в получении потребительского кредита"
+  }
+ },
+ {
+  "id": "104",
+  "source": "question",
+  "term": {
+   "cs": "Poskytovatel",
+   "ru": "Кредитор"
+  },
+  "meaning": {
+   "cs": "Ten, kdo v rámci svého podnikání poskytuje spotřebitelský úvěr",
+   "ru": "Тот, кто в рамках своей предпринимательской деятельности предоставляет потребительский кредит"
+  }
+ },
+ {
+  "id": "704",
+  "source": "question",
+  "term": {
+   "cs": "Fixační období",
+   "ru": "Период фиксации"
+  },
+  "meaning": {
+   "cs": "období, po které je spotřebiteli garantována úroková sazba",
+   "ru": "период, в течение которого потребителю гарантируется процентная ставка"
+  }
+ },
+ {
+  "id": "761",
+  "source": "question",
+  "term": {
+   "cs": "Tabulka umoření",
+   "ru": "Таблица погашения"
+  },
+  "meaning": {
+   "cs": "Tabulka, která obsahuje dlužné platby, lhůty a podmínky vztahující se ke splacení těchto částek, rozčlenění každé splátky ukazující umořování jistiny, úrok vypočítaný na základě úrokové sazby a veškeré dodatečné náklady",
+   "ru": "Таблица, содержащая причитающиеся платежи, сроки и условия, относящиеся к погашению этих сумм, а также разбивку каждого платежа, показывающую погашение основной суммы, проценты, рассчитанные на основе процентной ставки, и все дополнительные расходы"
+  }
+ },
+ {
+  "id": "12",
+  "source": "question",
+  "term": {
+   "cs": "Pojistné",
+   "ru": "Страховая премия"
+  },
+  "meaning": {
+   "cs": "Úplata za soukromé pojištění",
+   "ru": "Плата за частное страхование"
+  }
+ },
+ {
+  "id": "89",
+  "source": "question",
+  "term": {
+   "cs": "Obmyšlený",
+   "ru": "Выгодоприобретатель (obmyšlený)"
+  },
+  "meaning": {
+   "cs": "Osoba určená pojistníkem v pojistné smlouvě, které vznikne právo na pojistné plnění v případě smrti pojištěného",
+   "ru": "Лицо, назначенное страхователем в страховом договоре, у которого возникает право на страховое возмещение в случае смерти застрахованного"
+  }
+ },
+ {
+  "id": "291",
+  "source": "question",
+  "term": {
+   "cs": "Pojistník",
+   "ru": "Страхователь"
+  },
+  "meaning": {
+   "cs": "Osoba fyzická nebo právnická, která uzavřela pojistnou smlouvu s pojišťovnou a platí pojistné",
+   "ru": "Физическое или юридическое лицо, которое заключило договор страхования со страховой компанией и платит страховую премию"
+  }
+ }
+]

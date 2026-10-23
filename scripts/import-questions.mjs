@@ -6,6 +6,10 @@
 //   questions/source/assign.json     { questions: { <question id>: <topic key> }, cases: { <case id>: <topic key> } }
 //   questions/source/ru.json         optional Russian translations: { questions: { <id>: { question, options[] } },
 //                                    cases: { <case id>: text } } — shown by the CZ/RU switch
+//   questions/source/glossary.json   curated glossary: [{ id: <question id>, source: "answer"|"question", term: {cs, ru},
+//                                    meaning?: {cs, ru} }] — "answer": the meaning is that question's correct answer;
+//                                    "question": the term is the correct answer and the meaning is quoted from the
+//                                    question, which the import checks word for word. Written to questions/glossary.json.
 // A case-study question takes its case's topic. Usage: node scripts/import-questions.mjs
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -66,6 +70,33 @@ const rank = q => order.indexOf(q.topic);
 out.sort((a, b) => rank(a) - rank(b) || Number(a.case || 0) - Number(b.case || 0) || Number(a.id) - Number(b.id));
 out.forEach(q => delete q.topic);
 writeFileSync(join(root, 'questions', 'questions.json'), JSON.stringify(out, null, 1) + '\n');
+
+// glossary: every meaning comes from the exam text itself, never written by hand
+const glossaryPath = join(root, 'questions', 'source', 'glossary.json');
+if (existsSync(glossaryPath)) {
+  const byId = Object.fromEntries(out.map(q => [q.id, q]));
+  const cs = t => (typeof t === 'string' ? t : t.cs), ruOf = t => (typeof t === 'string' ? '' : t.ru || '');
+  const bad = [];
+  const glossary = read('glossary.json').map(g => {
+    const q = byId[g.id];
+    if (!q) { bad.push(`glossary ${g.id}: no such question`); return null; }
+    if (q.correct.length !== 1) { bad.push(`glossary ${g.id}: question has several correct answers`); return null; }
+    const answer = q.options[q.correct[0]];
+    let meaning;
+    if (g.source === 'answer') meaning = { cs: cs(answer), ru: ruOf(answer) };
+    else {
+      meaning = g.meaning;
+      if (!cs(q.question).includes(meaning.cs)) bad.push(`glossary ${g.id}: Czech meaning is not quoted from the question`);
+      if (ruOf(q.question) && !ruOf(q.question).includes(meaning.ru)) bad.push(`glossary ${g.id}: Russian meaning is not quoted from the question`);
+      if (!cs(answer).toLowerCase().includes(g.term.cs.toLowerCase().slice(0, 5))) bad.push(`glossary ${g.id}: term does not match the correct answer`);
+    }
+    return { id: 'g' + g.id, q: g.id, category: q.category, term: g.term, meaning };
+  }).filter(Boolean);
+  if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
+  writeFileSync(join(root, 'questions', 'glossary.json'), JSON.stringify(glossary, null, 1) + '\n');
+  console.log(`Glossary: ${glossary.length} terms`);
+}
+
 const counts = {}; out.forEach(q => counts[q.category] = (counts[q.category] || 0) + 1);
 console.log(`Imported ${out.length} questions, ${Object.keys(cases).length} case studies; Russian: ${out.filter(q => typeof q.question === 'object').length} questions, ${Object.keys(ru.cases).length} cases`);
 console.table(counts);

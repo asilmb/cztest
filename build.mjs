@@ -21,6 +21,8 @@ const jsonForScript = v => JSON.stringify(v).replace(/</g, '\\u003c');
 
 const snapshot = snapPath ? JSON.parse(readFileSync(snapPath, 'utf8')) : null;
 const config = existsSync(join(root, 'config.json')) ? JSON.parse(readFileSync(join(root, 'config.json'), 'utf8')) : {};
+const glossaryFile = join(root, 'questions', 'glossary.json');
+const glossary = existsSync(glossaryFile) ? JSON.parse(readFileSync(glossaryFile, 'utf8')) : [];
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 // shown at the bottom of every screen; `bank` tells the page when progress belongs to another question set
 // The bank fingerprint covers only question ids and their correct answers, so regrouping or rewording
@@ -46,6 +48,7 @@ if (!config.appsScriptUrl) console.warn('config.json has no "appsScriptUrl": the
 function assemble(target) {
   const app = readFileSync(join(root, 'src', 'app.js'), 'utf8')
     .replace('/*@QUESTIONS*/[]', () => jsonForScript(questions))
+    .replace('/*@GLOSSARY*/[]', () => jsonForScript(glossary))
     .replace('/*@SKELETON_HEAD*/""', () => target === 'artifact' ? jsonForScript(skeletonHead) : '""')
     .replace('/*@TARGET*/"artifact"', () => JSON.stringify(target))
     .replace("/*@BUILD*/{ version: 'dev', builtAt: 0, bank: 'dev', bankCompat: [] }", () => JSON.stringify(build))
