@@ -585,10 +585,12 @@ function viewSetup() {
         <div class="row"><button type="button" class="btn danger sm" data-action="discard">Да, удалить</button><button type="button" class="btn ghost sm" data-action="ask" data-what="">Нет</button></div></div>` : ''}
     </div>` : '';
 
+  const rec = recommendCat();
   const chip = c => {
     const n = QS.filter(q => q.category === c).length;
     const done = QS.filter(q => q.category === c && statusOf(q.id) === 'done').length;
-    return `<button type="button" class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${cfg.cats.includes(c)}">${esc(c)} <span class="count">${done}/${n}</span></button>`;
+    const star = rec && rec.cat === c ? `<span class="star" title="Рекомендуем пройти эту категорию">${STAR}</span>` : '';
+    return `<button type="button" class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${cfg.cats.includes(c)}">${star}${esc(c)} <span class="count">${done}/${n}</span></button>`;
   };
   const shownCats = isCases ? CASE_CATS : CATS;
   const noneShown = !cfg.cats.some(c => shownCats.includes(c));
@@ -777,6 +779,53 @@ function statBar(c, total, cls = '') {
   return `<div class="statbar ${cls}" role="img" aria-label="Освоено ${c.done}, в процессе ${c.learn}, ошибки ${c.err}, без ответа ${c.new}">${seg('done')}${seg('learn')}${seg('err')}${seg('new')}</div>`;
 }
 
+/* ---------- per-category accuracy and the category to practise next ---------- */
+const MIN_ANSWERS = 5;   // fewer answers than this in a category: accuracy is not shown as a bar yet
+function catStats(cat) {
+  const qs = QS.filter(q => q.category === cat);
+  let r = 0, w = 0, seen = 0;
+  qs.forEach(q => { const s = st(q.id); if (s && s.s) { seen++; r += s.r; w += s.w; } });
+  return { cat, total: qs.length, seen, r, w, answers: r + w, acc: r + w ? r / (r + w) : null };
+}
+// weakest category: low accuracy weighs most, little coverage next; accuracy is smoothed so a single
+// wrong answer in an untouched category does not outrank a well-practised weak one
+function recommendCat() {
+  const all = CATS.map(catStats);
+  if (!all.some(c => c.answers)) return null;
+  const score = c => 0.6 * (1 - (c.r + 1) / (c.answers + 2)) + 0.4 * (1 - c.seen / c.total);
+  const best = all.slice().sort((a, b) => score(b) - score(a))[0];
+  const reason = best.answers >= MIN_ANSWERS && best.acc < 0.75
+    ? `Здесь у вас меньше всего верных ответов: ${Math.round(best.acc * 100)} % из ${best.answers}.`
+    : best.seen === 0 ? `Вы ещё не отвечали ни на один вопрос этой категории (${best.total} вопросов).`
+    : `Здесь вы прошли меньше всего вопросов: ${best.seen} из ${best.total}${best.answers ? `, верных ответов ${Math.round(best.acc * 100)} %` : ''}.`;
+  return { cat: best.cat, reason };
+}
+const STAR = '⭐';
+
+function accuracyChart() {
+  const rec = recommendCat();
+  const rows = SECTIONS.map(sec => {
+    const list = CATS.filter(c => sectionOf(c) === sec.id).map(catStats);
+    if (!list.length) return '';
+    return `<p class="chip-group">${esc(sec.ru)}</p>` + list.map(c => {
+      const enough = c.answers >= MIN_ANSWERS, p = enough ? Math.round(c.acc * 100) : 0;
+      const star = rec && rec.cat === c.cat ? `<span class="star" aria-label="Рекомендуем пройти">${STAR}</span> ` : '';
+      return `<div class="hbar ${rec && rec.cat === c.cat ? 'is-rec' : ''}" title="${esc(c.cat)}: ${enough ? p + ' % верных из ' + c.answers + ' ответов' : 'мало ответов'}">
+        <span class="hbar-label">${star}${esc(c.cat)}</span>
+        <span class="hbar-track">${enough ? `<i style="width:${Math.max(p, 1)}%"></i>` : ''}</span>
+        <span class="hbar-val num">${enough ? p + ' %' : c.answers ? 'мало ответов' : '—'}</span>
+      </div>`;
+    }).join('');
+  }).join('');
+  const hint = rec
+    ? `<div class="rec-hint"><p><b>${STAR} Советуем пройти: ${esc(rec.cat)}</b><br>${esc(rec.reason)}</p>
+        <button type="button" class="btn primary sm" data-action="rec-go" data-cat="${esc(rec.cat)}">Пройти эту категорию</button></div>`
+    : `<div class="empty">Ответьте на несколько вопросов, и здесь появится совет, какую категорию пройти.</div>`;
+  return `<div class="hbars">${rows}</div>
+    <p class="small muted" style="margin:0">Доля верных ответов среди всех ответов в категории. Столбец появляется после ${MIN_ANSWERS} ответов.</p>
+    ${hint}`;
+}
+
 function viewStats() {
   const total = QS.length;
   const c = statusCounts(QS);
@@ -825,6 +874,10 @@ function viewStats() {
           <div class="kpi"><div class="v">${pct(right, answers)} %</div><div class="l">верных ответов</div></div>
           <div class="kpi"><div class="v">${hist.length}</div><div class="l">завершённых тестов</div></div>
         </div>
+      </section>
+      <section class="card stack">
+        <p class="section-label">Точность по категориям</p>
+        ${accuracyChart()}
       </section>
       <section class="card stack">
         <p class="section-label">${L('Úspěšnost napoprvé v posledních testech', 'Успешность с первой попытки в последних тестах')}</p>
@@ -1104,6 +1157,13 @@ document.addEventListener('click', e => {
       startRun(); return;
     case 'start-force': startRun(); return;
     case 'hint': S.hintOpen = !S.hintOpen; render(); return;
+    case 'rec-go': {
+      const c = b.dataset.cat;
+      cfg.cats = [c];
+      if (CASE_CATS.includes(c)) cfg.mode = 'cases';
+      else { if (cfg.mode === 'cases') cfg.mode = 'snowball'; cfg.kinds = []; }
+      savePrefs(); S.screen = 'setup'; render(); window.scrollTo(0, 0); return;
+    }
     case 'ddir': prefs.dict.dir = b.dataset.val === 'mt' ? 'mt' : 'tm'; savePrefs(); render(); return;
     case 'dcount': prefs.dict.count = Number(b.dataset.val); savePrefs(); render(); return;
     case 'dspeed': prefs.dict.speed = Number(b.dataset.val); savePrefs(); render(); return;
