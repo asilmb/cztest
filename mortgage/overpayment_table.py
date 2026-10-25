@@ -1,8 +1,8 @@
-"""Таблица коэффициентов-множителей для аннуитетного кредита (PDF).
+"""Таблица переплаты по аннуитетному кредиту в процентах от суммы кредита (PDF).
 
 K = общая сумма выплат / сумма кредита = n * r / (1 - (1 + r)^-n),
 где r — месячная ставка (годовая / 12), n — срок в месяцах.
-Переплата = S * (K - 1).
+Переплата, % = (K - 1) * 100.
 """
 import sys
 
@@ -32,7 +32,7 @@ def fmt(x, digits=3):
 def build(path):
     doc = SimpleDocTemplate(path, pagesize=landscape(A4),
                             leftMargin=24, rightMargin=24, topMargin=20, bottomMargin=18,
-                            title="Коэффициенты-множители аннуитетного кредита")
+                            title="Переплата по аннуитетному кредиту, %")
     title = ParagraphStyle("t", fontName="DejaVu-Bold", fontSize=12, leading=15)
     note = ParagraphStyle("n", fontName="DejaVu", fontSize=7, leading=9, textColor=colors.HexColor("#333333"))
 
@@ -41,7 +41,7 @@ def build(path):
     header_months = ["годовых"] + [f"{y * 12} мес" for y in YEARS]
     rows = [header_years, header_months]
     for rate in RATES:
-        rows.append([fmt(rate, 1) + " %"] + [fmt(coefficient(rate, y * 12)) for y in YEARS])
+        rows.append([fmt(rate, 1) + " %"] + [fmt((coefficient(rate, y * 12) - 1) * 100, 1) for y in YEARS])
 
     col_w = (doc.width - 44) / len(YEARS)
     table = Table(rows, colWidths=[44] + [col_w] * len(YEARS), rowHeights=[11, 10] + [11.6] * len(RATES))
@@ -74,15 +74,16 @@ def build(path):
     table.setStyle(TableStyle(style))
 
     story = [
-        Paragraph("Коэффициент-множитель K = общая сумма выплат / сумма кредита (аннуитет)", title),
+        Paragraph("Переплата по аннуитетному кредиту, % от суммы кредита", title),
         Spacer(1, 4),
         table,
         Spacer(1, 4),
         Paragraph(
-            "K = n·r / (1 − (1 + r)<super>−n</super>), где r = годовая ставка / 12, n — срок в месяцах. "
-            "Общая сумма выплат = S × K;  переплата = S × (K − 1);  ежемесячный платёж = S × K / n. "
-            "Пример: 4 600 000 ₽ под 6,0 % на 20 лет → K = " + fmt(coefficient(6.0, 240))
-            + ", выплаты ≈ " + f"{4_600_000 * coefficient(6.0, 240):,.0f}".replace(",", " ")
+            "Значения в таблице — переплата P в процентах от суммы кредита S. "
+            "P = (n·r / (1 − (1 + r)<super>−n</super>) − 1) × 100 %, где r = годовая ставка / 12, n — срок в месяцах. "
+            "Переплата = S × P / 100;  общая сумма выплат = S × (1 + P / 100);  ежемесячный платёж = S × (1 + P / 100) / n. "
+            "Пример: 4 600 000 ₽ под 6,0 % на 20 лет → P = " + fmt((coefficient(6.0, 240) - 1) * 100, 1)
+            + " %, выплаты ≈ " + f"{4_600_000 * coefficient(6.0, 240):,.0f}".replace(",", " ")
             + " ₽, переплата ≈ " + f"{4_600_000 * (coefficient(6.0, 240) - 1):,.0f}".replace(",", " ") + " ₽.",
             note),
     ]
