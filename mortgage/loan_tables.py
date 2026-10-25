@@ -4,8 +4,8 @@ K = общая сумма выплат / сумма кредита = n * r / (1 
 где r — месячная ставка (годовая / 12), n — срок в месяцах.
 
   overpayment_table.pdf  — переплата, % от суммы кредита: (K - 1) * 100
-  payment_table.pdf      — ежемесячный платёж на 1 000 000: 1 000 000 * K / n
-  monthly_rate_table.pdf — месячная ставка r и проценты за месяц на 1 000 000 остатка
+  payment_table.pdf      — множитель ежемесячного платежа: K / n
+  monthly_rate_table.pdf — месячная ставка r (множитель процентов за месяц)
 """
 import os
 import sys
@@ -38,8 +38,8 @@ def coefficient(annual_pct, months):
     return months * r / (1 - (1 + r) ** -months)
 
 
-def payment(annual_pct, months, principal=MILLION):
-    return principal * coefficient(annual_pct, months) / months
+def payment_factor(annual_pct, months):
+    return coefficient(annual_pct, months) / months
 
 
 def fmt(x, digits=3):
@@ -84,7 +84,7 @@ def base_style(rates, first_row):
     return style
 
 
-def grid_pdf(path, title, cell, note):
+def grid_pdf(path, title, cell, note, font_size=7):
     """Сетка «ставка × срок» на одной альбомной странице A4."""
     doc = SimpleDocTemplate(path, pagesize=landscape(A4), title=title,
                             leftMargin=24, rightMargin=24, topMargin=20, bottomMargin=18)
@@ -95,7 +95,8 @@ def grid_pdf(path, title, cell, note):
 
     col_w = (doc.width - 44) / len(YEARS)
     table = Table(rows, colWidths=[44] + [col_w] * len(YEARS), rowHeights=[11, 10] + [11.6] * len(RATES))
-    style = base_style(RATES, 2)
+    style = base_style(RATES, 2) + [("FONTSIZE", (1, 2), (-1, -1), font_size),
+                                    ("LEFTPADDING", (1, 2), (-1, -1), 1), ("RIGHTPADDING", (1, 2), (-1, -1), 1)]
     for j, y in enumerate(YEARS):
         if y % 5 == 0:  # 10, 15, 20, 25, 30 лет — разделители
             style.append(("LINEBEFORE", (j + 1, 0), (j + 1, -1), 0.8, NAVY))
@@ -116,30 +117,30 @@ def overpayment_pdf(path):
 
 
 def payment_pdf(path):
-    p = payment(6.0, 240)
+    a = payment_factor(6.0, 240)
     grid_pdf(
-        path, "Ежемесячный платёж на каждый 1 000 000 кредита (аннуитет)",
-        lambda rate, n: money(payment(rate, n)),
-        "Значения в таблице — ежемесячный платёж A на 1 000 000 суммы кредита. "
-        "A = 1 000 000 × r / (1 − (1 + r)<super>−n</super>), где r = годовая ставка / 12, n — срок в месяцах. "
-        "Платёж по кредиту S = S × A / 1 000 000 (т. е. A × число миллионов). "
-        f"Пример: 4 600 000 под 6,0 % на 20 лет → A = {money(p)}, платёж ≈ 4,6 × {money(p)} ≈ {money(4.6 * p)} в месяц. "
-        "Множитель в долях: A / 1 000 000 (например, 0,007164); в процентах от суммы: A / 10 000 %.")
+        path, "Множитель ежемесячного платежа: платёж = сумма кредита × A",
+        lambda rate, n: fmt(payment_factor(rate, n), 6),
+        "Значения в таблице — множитель A: ежемесячный платёж = S × A, где S — сумма кредита. "
+        "A = r / (1 − (1 + r)<super>−n</super>), где r = годовая ставка / 12, n — срок в месяцах. "
+        f"Пример: 4 600 000 под 6,0 % на 20 лет → A = {fmt(a, 6)}, платёж = 4 600 000 × {fmt(a, 6)} ≈ {money(4_600_000 * a)} в месяц. "
+        "Общая сумма выплат = S × A × n.",
+        font_size=6.3)
 
 
 def monthly_rate_pdf(path):
     doc = SimpleDocTemplate(path, pagesize=A4, title="Месячная ставка и проценты банку",
                             leftMargin=50, rightMargin=50, topMargin=28, bottomMargin=24)
-    rows = [["Годовая ставка", "Месячная ставка r\n(= годовая / 12)",
-             "Проценты банку за месяц\nна 1 000 000 остатка"]]
+    rows = [["Годовая ставка", "Месячная ставка\n(= годовая / 12)",
+             "Множитель r: проценты\nза месяц = остаток × r"]]
     for rate in RATES:
         r = monthly_rate(rate)
-        rows.append([fmt(rate, 1) + " %", fmt(r * 100, 4) + " %", money(r * MILLION)])
+        rows.append([fmt(rate, 1) + " %", fmt(r * 100, 4) + " %", fmt(r, 6)])
     table = Table(rows, colWidths=[110, 150, 170], rowHeights=[26] + [15.5] * len(RATES))
     style = base_style(RATES, 1) + [("FONTSIZE", (0, 0), (-1, -1), 9), ("LEADING", (0, 0), (-1, 0), 11)]
     table.setStyle(TableStyle(style))
 
-    first = payment(6.0, 360)
+    first = MILLION * payment_factor(6.0, 360)
     note = ParagraphStyle("n2", parent=NOTE, fontSize=8.5, leading=11)
     doc.build([
         Paragraph("Месячная ставка: какую часть остатка долга вы платите банку каждый месяц", TITLE),
@@ -149,8 +150,8 @@ def monthly_rate_pdf(path):
         Paragraph(
             "Проценты за месяц = текущий остаток долга × r. Остальная часть ежемесячного платежа идёт в погашение долга, "
             "поэтому остаток уменьшается, и доля процентов в платеже со временем падает, хотя сам платёж (аннуитет) не меняется. "
-            f"Пример: 1 000 000 под 6,0 % на 30 лет → платёж {money(first)}; в первый месяц "
-            f"{money(MILLION * monthly_rate(6.0))} уходит банку (0,5 % от 1 000 000), "
+            f"Пример: 1 000 000 под 6,0 % на 30 лет → платёж 1 000 000 × {fmt(payment_factor(6.0, 360), 6)} ≈ {money(first)}; в первый месяц "
+            f"1 000 000 × 0,005 = {money(MILLION * monthly_rate(6.0))} уходит банку, "
             f"{money(first - MILLION * monthly_rate(6.0))} — в погашение долга.", note),
     ])
 
